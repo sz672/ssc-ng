@@ -1,0 +1,7 @@
+v 3
+d SSC-NG arithmetic helper
+d Version: 0.1.0
+d Local pilot fixture: supplies a doubling operation.
+d Requires Stata 16 or later.
+f sscng_helper.ado
+f sscng_helper.sthlp

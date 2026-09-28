@@ -1,0 +1,11 @@
+{
+  "name": "sscng_example",
+  "version": "1.1.0",
+  "title": "SSC-NG arithmetic example with dependency",
+  "maintainer": "SSC-NG example maintainer",
+  "email": "example@example.invalid",
+  "stata": "16.0",
+  "license": "Unspecified",
+  "dependencies": [{ "name": "sscng_helper", "version": "0.1.0" }],
+  "notes": "Local test fixture. Uses sscng_helper 0.1.0 to double the supplied value, then adds one. This deliberately changes value(2) from 4 to 5 so the two releases are easy to distinguish. The maintainer contact is illustrative."
+}

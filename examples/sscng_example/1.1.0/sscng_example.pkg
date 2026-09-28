@@ -1,0 +1,7 @@
+v 3
+d SSC-NG arithmetic example
+d Version: 1.1.0
+d Local pilot fixture: doubles the supplied value and adds one.
+d Requires Stata 16 or later and sscng_helper 0.1.0.
+f sscng_example.ado
+f sscng_example.sthlp

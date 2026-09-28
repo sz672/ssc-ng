@@ -1,120 +1,94 @@
-# Version control for the SSC-NG demo
+# Version control for SSC-NG
 
-This guide creates history under **your own Git identity**. The supplied ZIP has no `.git` directory, remote repository, or prewritten commit history.
+The existing source repository is `ssc-ng`. Continue using its current Git
+history and remote; do not initialize another repository over this folder.
 
-## Three different kinds of version
+## Different histories serve different purposes
 
-| Term | What it records |
+| Record | Meaning |
 | --- | --- |
-| Git commit | A saved change to this website's source files, with an author, message, and parent history |
-| Release tag, such as `v0.1.0` | A named checkpoint pointing to one website commit; a GitHub Release can attach notes and downloads to it |
-| Package release inside the demo, such as `1.1.0` | Fictional Stata package data in the browser; it does not create a Git commit or tag |
+| Source Git commit | A saved change to the portal, server, examples, or documentation |
+| Source tag `v0.1.0` | The original browser-only meeting prototype |
+| Source `VERSION` value `0.2.0` | The current local pilot's version label; not evidence of a published Git tag or Release |
+| Submission and check records | Local package candidates and their actual checking/review activity |
+| Package release such as `sscng_example` `1.1.0` | An approved Stata package bundle in the local archive |
 
-The `VERSION` file contains `0.1.0`. `CHANGELOG.md` describes changes to the website. Treat published release tags as fixed: correct a released problem in a new commit and release rather than moving the old tag.
+The `.sscng/` directory holds runtime data and is excluded from Git. Publishing
+a package in this pilot does not commit or push the project's source code.
+Conversely, pushing the repository does not upload the local package archive
+or start a running package service.
 
-## Simplest first upload: your browser
+Treat published tags and approved package versions as fixed checkpoints. Correct
+a released problem in a new source commit or package version so the prior
+record remains explainable.
 
-1. [Create a new repository on GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-new-repository) under your account. Make it empty: do not initialize it with a README, `.gitignore`, or license.
-2. Click **uploading an existing file** on the empty repository page, or **Add file → Upload files** if available.
-3. Upload the **extracted project contents**, including `assets`, `docs`, and dotfiles, rather than the ZIP. Check that `index.html` is directly at the repository root. On a Mac, **Command+Shift+.** makes dotfiles visible in Finder.
-4. Commit with the message **`Initial SSC-NG demo (v0.1.0)`**.
-5. Optionally open **Releases → Draft a new release**, create the tag **`v0.1.0`** targeting the uploaded `main` commit, and add the changelog notes. Publish when ready.
+## Save changes with GitHub Desktop
 
-This creates real Git history in GitHub under your account. To edit locally later, **clone this existing repository** using GitHub Desktop or Git; do not initialize a separate repository over it. See [GitHub's file-upload instructions](https://docs.github.com/en/repositories/working-with-files/managing-files/adding-a-file-to-a-repository) and [release instructions](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository).
+1. Open the existing `ssc-ng` repository in GitHub Desktop.
+2. Inspect the **Changes** list and each diff. `.sscng/`, generated ZIPs, logs,
+   and local check output should not appear as files to commit.
+3. Run the relevant implementation checks and the local demonstration.
+4. Commit the intended source changes with a short summary, for example
+   `Add local Stata submission and review pilot`.
+5. Use **Push origin** to send that commit to the existing remote.
 
-## Alternative first upload: GitHub Desktop
+For a change that needs review, create a branch first, publish the branch after
+committing, and open a pull request. Confirm your name and intended commit email
+in Desktop's Git settings before making commits.
 
-1. Sign in to GitHub Desktop with your own GitHub account. Check its **Git** settings so new commits use your name and intended email. A GitHub-provided private commit email is also an option.
-2. Choose **File → New repository**. Use a name such as `ssc-ng-demo` and select a local parent folder. Leave the README option unchecked and choose no license. Create the repository. Desktop may create an initial commit for its generated files.
-3. Extract the ZIP. Copy **everything inside the extracted project folder** into the new repository folder, including dotfiles. `index.html` must sit directly at the repository root, beside `assets`, `docs`, and `VERSION`; avoid an extra nested project folder. On a Mac, **Command+Shift+.** shows hidden files in Finder.
-4. In Desktop, review the changed files. Enter **`Initial SSC-NG demo (v0.1.0)`** as the commit summary and commit to `main`.
-5. Click **Publish repository**. Select the intended account or organization and visibility, then publish. This is the step that sends your repository to GitHub.
-6. On GitHub, optionally open **Releases → Draft a new release**, create the tag **`v0.1.0`** targeting the uploaded `main` commit, and add the corresponding changelog notes. Publish it when ready. Tag creation through this interface is sufficient for a named checkpoint; the command-line route below explicitly creates an annotated tag.
+## Preserve and inspect the first meeting version
 
-Desktop will show future edits in its **Changes** view and earlier commits in **History**. You can inspect a commit's diff to see exactly which source lines changed.
-
-## Command-line alternative
-
-Use this alternative instead of the Desktop initialization steps. Open a terminal in the extracted project folder. Replace the identity placeholders with your own details; the configuration below applies only to this repository.
-
-```sh
-git init -b main
-git config user.name "YOUR NAME"
-git config user.email "YOUR COMMIT EMAIL"
-git add .
-git status
-git commit -m "Initial SSC-NG demo (v0.1.0)"
-```
-
-Review `git status` before committing so the selected files are the ones you intend to publish.
-
-Next, [create a new repository on GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-new-repository). Create an **empty repository**: do not initialize it with a README, `.gitignore`, or license, because your local repository already has its own history.
-
-Replace `YOUR-ACCOUNT` and the repository name in the URL below with the real destination. GitHub may ask you to authenticate when pushing.
+These commands inspect the existing checkpoint without changing local files:
 
 ```sh
-git remote add origin https://github.com/YOUR-ACCOUNT/ssc-ng-demo.git
-git push -u origin main
-git tag -a v0.1.0 -m "SSC-NG meeting demo v0.1.0"
-git push origin v0.1.0
-```
-
-The annotated tag names the initial website release. You can later create a GitHub Release using that existing tag and copy in the changelog notes. See [GitHub's release instructions](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository).
-
-## Future changes and releases
-
-For a change you want colleagues to review, create a feature branch from an up-to-date `main`, edit the files, inspect the diff, run the relevant checks, and commit. For example:
-
-```sh
-git switch main
-git pull --ff-only
-git switch -c feature/reviewer-notes
-```
-
-After editing:
-
-```sh
-git diff
-git add index.html assets/app.js
-git commit -m "Clarify reviewer notes in the submission workflow"
-git push -u origin feature/reviewer-notes
-```
-
-Stage the files you actually changed; the paths above are an example. Open a pull request on GitHub, explain the change and how you checked it, and merge after review. GitHub Desktop supports the same sequence through **New branch**, commit, **Publish branch**, and **Create pull request**.
-
-When a group of changes is ready to release:
-
-1. Update `VERSION`, add a dated entry to `CHANGELOG.md`, and update any displayed website version, including the README. For example, use `0.1.1` for a small fix or `0.2.0` for a substantial new capability. Do not change fictional package versions solely to match the website version.
-2. Commit these release changes and merge them into `main` through the same review process.
-3. Fetch the merged commit, tag it, and push the new tag:
-
-```sh
-git switch main
-git pull --ff-only
-git tag -a v0.1.1 -m "SSC-NG meeting demo v0.1.1"
-git push origin v0.1.1
-```
-
-4. Optionally publish a GitHub Release for `v0.1.1` using its changelog entry.
-
-Use a fresh tag for each release. When GitHub Pages publishes from `main`, it follows changes to that branch; creating a tag alone does not select an older website version for Pages.
-
-## Inspect or undo a change
-
-These read-only commands help explain what changed:
-
-```sh
-git log --oneline --decorate
 git show v0.1.0
-git diff v0.1.0..main
+git diff v0.1.0 -- README.md
+git log --oneline --decorate
 ```
 
-To undo a shared change, prefer a **revert**: it adds another commit that reverses a selected change while preserving the original history. Perform it on a new branch and review it through a pull request. Avoid rewriting published history or force-pushing just to remove a mistake.
+To open a separate copy of the original prototype while keeping the current
+pilot working tree intact, create a separate worktree:
 
-The demo's **Restore** button only selects fictional package data in browser memory. It does not revert this website's Git repository or install software.
+```sh
+git worktree add --detach ../ssc-ng-v0.1.0 v0.1.0
+```
 
-## Optional GitHub Pages
+Open that copy's `index.html` to see the browser-only prototype. Its interactions
+are simulated and reset on reload. The current local pilot must be started with
+`server.py` and persists data on disk.
 
-In the GitHub repository, open **Settings → Pages**, choose **Deploy from a branch**, and select **main** with **/ (root)**. Save and use the URL GitHub provides after deployment completes. If Pages is unavailable, check the repository visibility and your account plan. [Official configuration instructions](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
+## Create a later source release when ready
 
-No license is automatically assigned to this project. Agree on one with the team before adding a `LICENSE` file; the example package's license selector does not settle the website's license.
+The working tree's `VERSION` and changelog describe `0.2.0`. They do not publish
+it. After reviewing, testing, committing, and pushing the intended source:
+
+1. Confirm that the selected commit is the one you want to preserve.
+2. Create a fresh tag such as `v0.2.0` on that commit. Do not move `v0.1.0`.
+3. Push the new tag to the existing remote.
+4. If desired, create a GitHub Release from that tag and copy its changelog notes.
+
+For example, after verifying the current commit:
+
+```sh
+git status
+git log -1 --oneline
+git tag -a v0.2.0 -m "SSC-NG local pilot v0.2.0"
+git push origin v0.2.0
+```
+
+Use these commands only when that version is ready. A tag push does not push
+uncommitted edits, publish a GitHub Release page, or deploy the backend.
+
+## Local archive backup and hosting
+
+Keep a separate backup of `.sscng/` if its submissions and approved packages
+matter. Stop the local service before copying the data directory so files are
+not changing during the copy. Source Git history is not a backup of that data.
+
+GitHub Pages can serve static files, but it cannot run this Python service or
+licensed Stata checks. The functioning `0.2.0` pilot currently runs on the local
+machine. Public hosting would require a separate deployment design, execution
+isolation, authentication, and an appropriate Stata licensing arrangement.
+
+No project license has been selected. Package metadata is separate from the
+license of the portal's source code.

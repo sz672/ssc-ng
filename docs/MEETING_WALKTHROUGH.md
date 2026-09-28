@@ -1,63 +1,129 @@
-# First-meeting walkthrough
+# Local pilot meeting walkthrough
 
-Allow about ten minutes. Open index.html in a browser. Everything displayed is
-fictional, and each change of demo case starts over. Reloading also resets state.
+Allow about ten minutes. Start `python3 server.py --port 8765` from the project
+root and open <http://127.0.0.1:8765>. Use the built-in example packages or build
+their ZIPs with `python3 examples/build_examples.py`.
 
-## 1. Metadata and an ordinary update
+For a fresh archive without deleting previous work, use a new data directory:
 
-Choose **Routine update**. Inspect the required fields and switch the sample input
-between ZIP and Git. Click **Run demo checks**, inspect the results, then click
-**Approve demo release** and **View package history**.
+```sh
+python3 server.py --port 8765 --data-dir .sscng/meeting-run
+```
 
-Discuss: Which fields must be required immediately? Which checks should initially
-produce warnings? Does a routine update still need a brief human approval?
+Choose another directory name for each fresh demonstration. If automatic Stata
+discovery fails, pass `--stata /path/to/your/StataExecutable`.
 
-## 2. Installation is different from working execution
+The examples contain real, small Stata programs and assertions. The workflow
+persists submissions, check results, decisions, and locally approved releases.
+Refreshing the page does not reset it. Package contacts are illustrative and
+the pilot has no authenticated reviewer accounts.
 
-Choose **Missing dependency**, then **Run demo checks**. Installation passes while
-the example fails. Approval is blocked. Add a reviewer note and select **Request
-changes**, then **Add missing dependency & rerun**. The revision number increases.
-Inspect the new results, approve, and see the dependency recorded in release history.
+## 1. A package without dependencies
 
-Discuss: Must every submission include a runnable example? What explains a failure
-well enough for an author to correct it? How should unavailable test infrastructure
-be distinguished from broken package code?
+Select `sscng_example` version `1.0.0`. Inspect its metadata and source, confirm
+that this supplied code is trusted, and choose **Submit example for checks**.
+Checks start automatically; inspect their recorded Stata output. The smoke test calls `sscng_example, value(2)` and
+asserts that `r(result)` equals `4`; it also checks a negative input.
 
-## 3. Ownership changes
+Approve the passing candidate and open its package history. The local archive
+now contains a real release bundle. Download it to inspect the `.pkg`, `.ado`,
+help file, metadata, and smoke test.
 
-Choose **Maintainer transfer**, then **Run demo checks**. Approval remains blocked
-until **Simulate prior-owner confirmation** is selected. Approve the transfer and
-open package history. The maintainer changes; the existing release does not.
+Discuss: Which metadata is mandatory? What should a reviewer examine after the
+automated checks pass? What must be recorded with an approval?
 
-Discuss: What evidence should authorize a transfer? What is the recovery procedure
-when the previous maintainer cannot be reached?
+## 2. An update with a missing dependency
 
-## 4. Historical releases
+Submit `sscng_example` version `1.1.0` before approving the helper package. This
+update calls `sscng_helper` version `0.1.0` and then adds one to its result. Its
+metadata declares that exact dependency. Run checks and inspect the missing
+dependency result. The candidate cannot be approved while its checks fail.
 
-Open **Package history** and select 1.0.1 or 1.0.0. Compare the file versions and
-diffs. The helper file retains version 0.4.0. Expand the daily-capture example:
-unchanged days point to the same bundle. **Restore ... in demo** changes only the
-simulated environment label. Installation commands use a non-working example URL.
+This deliberately demonstrates a dependency absent from the local archive. It
+is not evidence that an external package or the public SSC archive is broken.
+If the helper is already present from an earlier demonstration, this step will
+no longer reproduce the missing-dependency case.
 
-Discuss: Is this the right distinction between package releases, file versions,
-submission revisions, and observations from a nightly archive?
+Discuss: Must dependencies be approved before their dependants? How should the
+service distinguish missing dependencies, a failed test, and unavailable Stata?
+
+## 3. Make the dependency available and check again
+
+Submit `sscng_helper` version `0.1.0`, run its real Stata assertions, and approve
+the passing helper. In **Checks & review**, select the failed example `1.1.0`
+and choose **Create revised submission**. Keep its metadata, leave the ZIP field
+empty to reuse the saved bundle, confirm trust again, and choose **Submit & run
+checks**. The new revision receives its own check record; the failed record is
+retained. Unchanged source may be retried after a failed or unavailable check.
+
+The new test now verifies that `value(2)` returns `5`, and that `value(-3)` returns
+`-5`. Approve the passing revision. If uploading a ZIP manually instead, complete
+the metadata fields yourself: the form does not import `metadata.json`.
+
+The changed arithmetic is intentional: it makes the two example releases
+visibly different. It is not a proposed change to any research command.
+
+Discuss: Should reviewers see the prior failed check and the dependency version
+used by the successful check? What should happen if a dependency is updated
+after a candidate has been checked?
+
+## 4. Inspect historical releases
+
+Open the history for `sscng_example` and inspect versions `1.0.0` and `1.1.0`.
+Compare their source files, metadata, and dependencies. Both release bundles
+remain available; approving `1.1.0` does not replace `1.0.0`.
+
+Restore version `1.0.0` and inspect the real installation and smoke-test result.
+The pilot creates a separate library for this run and records its path. The
+assertions should again confirm that `value(2)` returns `4`. Restoring `1.1.0`
+also installs its approved helper dependency and checks for `5`. These operations
+do not replace packages in your normal Stata `PLUS` directory.
+
+Inspect the local catalog captures. A capture records the highest approved
+version of each package and its bundle hash. The service captures each UTC day
+while running and supports manual captures; it does not invent missing days or
+collect the public SSC archive.
+
+The source repository has its own history: `v0.1.0` preserves the earlier
+browser prototype. Package release `1.0.0` is a different version number and
+does not create a Git commit or tag for this website.
+
+Discuss: What else must be preserved to rerun an old analysis: Stata version,
+dependency bundles, data, operating system, and execution instructions?
+
+## 5. Record an operator-approved maintainer transfer
+
+Open **Registry records**, select `sscng_example`, and enter a demonstration
+successor such as `Example successor` with `successor@example.invalid`. Describe
+the example authorization evidence, save the request, and inspect it before
+choosing **Approve recorded transfer**.
+
+The current recorded maintainer changes, while archived package contents and
+their original metadata remain intact. This records the local operator's
+decision. It does not send a verification email, independently check consent,
+or create authenticated access for the successor.
+
+Discuss: What evidence should authorize a real transfer? Who may review it?
+How should recovery work when the prior maintainer cannot be reached?
 
 ## Decisions to record
 
-- Required metadata for the pilot.
-- Checks that block publication and checks that warn.
-- Reviewer responsibility and escalation path.
-- Evidence needed for maintainer claims and transfers.
-- A small set of real packages and authors for a later supervised pilot.
+- Required package metadata and smoke-test expectations.
+- Which failures block approval and how reviewers record exceptions.
+- Dependency acceptance and exact-version retention rules.
+- Evidence, authentication, and permissions required for real maintainer transfers.
+- A small, consenting group of package authors for a later supervised pilot.
+- Execution isolation and operational requirements before accepting public code.
 
-## Pilot measures to collect later
+## Evidence to collect
 
 | Measure | Suggested definition |
 | --- | --- |
 | Reviewer time | Active minutes spent reviewing each submission, excluding queue time |
-| Correction rounds | Number of revised submissions before acceptance |
-| Publication time | Time from initial submission to publication, also separating author and queue delays |
-| Restoration success | Archived releases that install and pass their recorded example, divided by eligible releases attempted |
+| Correction rounds | Revised submissions before acceptance |
+| Publication time | Submission to approval, separating author and check delays |
+| Historical installation success | Archived bundles that install and pass their recorded examples, divided by attempts |
 
-The demo does not measure these outcomes. Collect baseline results from the current
-process before making claims about improvement.
+The local pilot can supply individual records and logs. These are not yet a
+comparative evaluation of SSC-NG. Collect baseline observations from the current
+process before claiming an improvement.
