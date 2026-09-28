@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An interactive SSC-NG meeting prototype for package submission, human review, and release history.">
+  <title>SSC-NG Meeting Demo</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+<div id="sscng-meeting">
+  
+  <header class="sg-top">
+    <div><div class="sg-brand">SSC <span>/ NG</span></div><div class="sg-small">Community package registry</div></div>
+    <div class="sg-scenario"><label for="sg-scenario">Demo case</label><select id="sg-scenario"><option value="routine">Routine update</option><option value="dependency">Missing dependency</option><option value="transfer">Maintainer transfer</option></select></div>
+  </header>
+  <nav class="sg-tabs" aria-label="Demo screens" role="tablist">
+    <button type="button" id="sg-tab-submit" role="tab" aria-selected="true" aria-controls="sg-submit" data-tab="submit">1 · Metadata</button>
+    <button type="button" id="sg-tab-review" role="tab" aria-selected="false" aria-controls="sg-review" data-tab="review">2 · Checks & review</button>
+    <button type="button" id="sg-tab-history" role="tab" aria-selected="false" aria-controls="sg-history" data-tab="history">3 · Package history</button>
+  </nav>
+  <div class="sg-content">
+    <section id="sg-submit" role="tabpanel" aria-labelledby="sg-tab-submit">
+      <div class="sg-intro"><div><div class="sg-kicker">Author workspace</div><h2 id="sg-form-title">Submit a package update</h2><p id="sg-form-subtitle">sscng_example · Current release 1.0.1</p></div><span class="sg-badge" id="sg-draft">Draft</span></div>
+      <div class="sg-grid">
+        <div class="sg-panel">
+          <div class="sg-fields" id="sg-package-fields">
+            <label>Package name<input id="sg-name" value="sscng_example" readonly></label>
+            <label>Release version *<input id="sg-version" value="1.1.0" aria-describedby="sg-version-help"></label>
+            <label class="sg-full">Title *<input id="sg-title" value="Panel-data consistency checks"></label>
+            <label>Maintainer<input id="sg-maintainer" value="Alex Chen" readonly></label>
+            <label>Email<input id="sg-email" value="alex@example.org" readonly></label>
+            <label>Minimum Stata version *<select id="sg-stata"><option>16.0</option><option>17.0</option><option>18.0</option></select></label>
+            <label>License *<select id="sg-license"><option>MIT</option><option>BSD-3-Clause</option><option>GPL-3.0</option></select></label>
+            <label class="sg-full">Dependencies *<input id="sg-deps" value="None" placeholder="Package and supported version, or None"></label>
+            <label class="sg-full">Release notes *<textarea id="sg-notes">Adds a check for missing periods within panels.</textarea></label>
+          </div>
+          <div id="sg-transfer-fields" hidden>
+            <div class="sg-fields"><label>Current maintainer<input value="Alex Chen" readonly></label><label>Proposed maintainer<input value="Morgan Lee" readonly></label><label class="sg-full">New contact<input value="morgan@example.org" readonly></label><label class="sg-full">Reason<textarea readonly>Existing co-author will take over package maintenance.</textarea></label></div>
+            <div class="sg-note">Ownership request only · Published release remains 1.0.1.</div>
+          </div>
+          <div class="sg-caption" id="sg-version-help">* Required in this proposed pilot. Fields are editable.</div>
+          <div class="sg-error" role="alert" id="sg-form-error" hidden></div>
+          <div class="sg-actions"><button type="button" class="sg-primary" data-action="run">Run demo checks</button><span class="sg-small">Simulated results</span></div>
+        </div>
+        <aside class="sg-panel">
+          <h3 id="sg-source-title">Submission source</h3>
+          <div id="sg-source-controls"><label for="sg-source" class="sg-small">Sample input</label><select id="sg-source"><option value="zip">ZIP upload</option><option value="git">Git repository</option></select><div id="sg-source-detail" class="sg-note"></div></div>
+          <h3 style="margin-top:22px" id="sg-files-title">Included files</h3>
+          <ul class="sg-list" id="sg-file-list"></ul>
+          <div class="sg-note" id="sg-source-note">Source files are preloaded examples. No upload is sent.</div>
+        </aside>
+      </div>
+    </section>
+    <section id="sg-review" role="tabpanel" aria-labelledby="sg-tab-review" hidden></section>
+    <section id="sg-history" role="tabpanel" aria-labelledby="sg-tab-history" hidden></section>
+    <div id="sg-announcement" role="status" aria-live="polite" class="sg-toast" hidden></div>
+  </div>
+  <footer class="sg-footer"><span>Meeting prototype · Fictional records · No Stata execution or real publication</span><span>Changing the demo case starts a fresh example.</span></footer>
+  
+</div>
+
+<noscript>This interactive prototype needs JavaScript enabled.</noscript>
+</body>
+</html>
