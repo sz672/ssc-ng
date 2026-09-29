@@ -3,6 +3,21 @@
   'use strict';
   const root = document.getElementById('sscng-meeting');
   const q = id => document.getElementById(id);
+  if (window.location.protocol === 'file:') {
+    q('sg-service-status').textContent = 'Open the local app';
+    q('sg-stata-status').textContent = 'This HTML file is the interface only';
+    root.querySelector('.sg-tabs').hidden = true;
+    q('sg-submit').innerHTML = `<div class="sg-empty">
+      <div class="sg-kicker">SSC-NG local pilot</div>
+      <h2>Open the working demo</h2>
+      <p>Package uploads, Stata checks, reviews, and saved releases run through the local service on your Mac.</p>
+      <a class="sg-link-button" href="http://127.0.0.1:8765/">Open SSC-NG on this Mac →</a>
+      <p>If the app is not running, open Terminal in the ssc-ng project folder and start it with:</p>
+      <pre>python3 server.py --port 8765</pre>
+      <p>Keep that Terminal window open while using the app, then follow the link above.</p>
+    </div>`;
+    return;
+  }
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const tabs = ['submit', 'review', 'history', 'records'];
   const state = {data: null, tab: 'submit', selectedSubmission: null, selectedRelease: null, revision: null, busy: false, signature: '', notes: {}, transferDraft: {}, diff: null, restore: null};

@@ -7,6 +7,8 @@ __pycache__/
 *.pyc
 *.log
 *.zip
+!smoke-package/dist/sscng_smoke-1.0.0.zip
+!smoke-package/dist/sscng_smoke-1.1.0.zip
 .env
 .env.*
 !.env.example

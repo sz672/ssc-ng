@@ -1,0 +1,11 @@
+{
+  "name": "sscng_smoke",
+  "version": "1.0.0",
+  "title": "SSC-NG standalone arithmetic smoke package",
+  "maintainer": "SSC-NG smoke-package contributors",
+  "email": "smoke@example.invalid",
+  "stata": "16.0",
+  "license": "MIT",
+  "dependencies": [],
+  "notes": "Initial standalone smoke package. sscng_smoke, value(2) prints its version and returns 4. No external package dependencies. Includes positive, negative, zero, fractional, and version assertions. Maintainer contact is illustrative."
+}

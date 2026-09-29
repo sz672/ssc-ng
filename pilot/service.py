@@ -21,6 +21,7 @@ import uuid
 from .packages import bundle_files, discover_stata, run_stata, validate_bundle
 
 ROOT = Path(__file__).resolve().parent.parent
+APP_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 NAME = re.compile(r"[a-z][a-z0-9_]{0,31}\Z")
 VERSION = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\Z")
 
@@ -157,7 +158,7 @@ class Registry:
             release["download_url"] = f"/api/releases/{release['name']}/{release['version']}/download"
         with self.connect() as db:
             events = [dict(zip(("id", "created_at", "kind", "message"), row)) for row in db.execute("SELECT id,created_at,kind,message FROM events ORDER BY id DESC LIMIT 200")]
-        return {"version": "0.2.0", "stata": {"available": bool(self.stata_path), "path": self.stata_path},
+        return {"version": APP_VERSION, "stata": {"available": bool(self.stata_path), "path": self.stata_path},
                 "submissions": self.rows("submissions"), "releases": releases, "events": events,
                 "snapshots": self.rows("snapshots"), "transfers": self.rows("transfers"),
                 "environment": self.setting("environment"),
@@ -399,7 +400,7 @@ class Registry:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "SSCNG/0.2"
+    server_version = f"SSCNG/{APP_VERSION}"
 
     @property
     def registry(self):
