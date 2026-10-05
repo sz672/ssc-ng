@@ -1,0 +1,42 @@
+{
+  "package": "fre",
+  "version": "1.2.5",
+  "author": "Ben Jann",
+  "repository": "https://github.com/benjann/fre",
+  "commit": "f90bd6741423b847349c3106da12fc12c174330c",
+  "retrieved": "2026-10-05",
+  "license": "MIT",
+  "upstream_files": {
+    "fre.ado": {
+      "url": "https://raw.githubusercontent.com/benjann/fre/f90bd6741423b847349c3106da12fc12c174330c/fre.ado",
+      "sha256": "f71226cc6c529daa3953b019f203ae9a7c24fe0896c4e8f292dc0d934170f0ba",
+      "size": 27868
+    },
+    "fre.hlp": {
+      "url": "https://raw.githubusercontent.com/benjann/fre/f90bd6741423b847349c3106da12fc12c174330c/fre.hlp",
+      "sha256": "d123cc63743834d30d8f3fd3c40ac592982659383698757fd6681e49fb2a339a",
+      "size": 20650
+    },
+    "fre.pkg": {
+      "url": "https://raw.githubusercontent.com/benjann/fre/f90bd6741423b847349c3106da12fc12c174330c/fre.pkg",
+      "sha256": "bd3d296898feb364b6a560d1a26a71850df031f06d130bf93bd1d898265f8f2b",
+      "size": 176
+    },
+    "LICENSE": {
+      "url": "https://raw.githubusercontent.com/benjann/fre/f90bd6741423b847349c3106da12fc12c174330c/LICENSE",
+      "sha256": "288edc639f5c34173d148186f8254137b78c1d86f48f45400f509c0566fbb67f",
+      "size": 1065
+    },
+    "stata.toc": {
+      "url": "https://raw.githubusercontent.com/benjann/fre/f90bd6741423b847349c3106da12fc12c174330c/stata.toc",
+      "sha256": "0a0314cd8e7fafa5b73bd5c5a578ad86dd0711779d37ae65d4540f37f4b72233",
+      "size": 58
+    }
+  },
+  "purpose": "Local SSC-NG submission trial; not a submission by the upstream author.",
+  "demo_additions": [
+    "metadata.json",
+    "fre_check.do",
+    "SOURCE.json"
+  ]
+}

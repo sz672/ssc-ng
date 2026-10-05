@@ -1,46 +1,17 @@
-# SSC-NG 0.1.0 — instructions and change record
+# SSC-NG 0.1.0 — submission demo
 
-This is the first local baseline for the revised SSC-NG direction: receive a
-Stata package, check it, review it, preserve versions, and install an older version.
-It is a development pilot, separate from the public [SSC-NG website](https://ssc-ng.net/).
-The proposed architecture follows the [published development plan](https://ssc-ng.net/development-plan/).
+Upload a Stata package, confirm its maintainer, run checks, review changes, and
+deliver the approved files to **today's archive**. The existing
+[ssc-ng/archive](https://github.com/ssc-ng/archive/) process handles historical
+versions. This demo writes locally; it does not publish to the production archive.
 
 **Working rule:** work locally. Do not commit, tag, push, or publish to GitHub
-unless you explicitly ask. Update this file when a version changes.
+unless explicitly requested. Keep the application label in `VERSION` and add
+concise dated changes below. Package versions are separate from this label.
 
-## 1. What to keep and what each file does
+## Run the demo
 
-There are two project documents to read:
-
-| File | Use |
-| --- | --- |
-| **README.md — this file** | Start the demo, upload/install the smoke packages, find saved data, and read the version change record |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Understand storage, original-source links, platform-neutral submissions, PR review, and recovery without GitHub; distinguishes current features from proposals |
-
-The working application and its tests remain in place:
-
-| File or directory | Use |
-| --- | --- |
-| `VERSION` | Current application label, `0.1.0`; also read by the API and displayed in the running app |
-| `server.py` | Starts the local web service |
-| `pilot/service.py` | Uploads, database records, checks queue, approvals, release downloads and Stata endpoints |
-| `pilot/packages.py` | Validates package ZIPs and runs Stata checks |
-| `index.html`, `assets/` | Browser interface, styling, and interactions |
-| `smoke-package/1.0.0/`, `smoke-package/1.1.0/` | Inspectable source files for the two new smoke-package versions |
-| `smoke-package/build.py` | Rebuilds their ZIPs with stable archive metadata |
-| `smoke-package/dist/` | Two ready-to-upload ZIPs and `manifest.json` listing their hashes and metadata |
-| `examples/` | Older built-in dependency fixtures used by the app and its regression tests; not needed for the new smoke exercise |
-| `tests/` | Automated implementation checks and optional real-Stata/browser checks |
-| `.sscng/` | Saved local registry and package files; hidden in Finder and excluded from Git |
-| `.git/`, `.gitignore`, `.gitattributes`, `.github/`, `.nojekyll` | Existing source history and repository configuration; `.github` contains the development PR template |
-
-The separate walkthrough, version-control guide, research note, and changelog
-were consolidated into these two documents. Source code, test fixtures, and
-existing saved submissions were preserved.
-
-## 2. Open the working demo
-
-In Terminal:
+Use Python 3.10 or later and a licensed Stata installation:
 
 ```sh
 cd /Users/J.J./Dropbox/ssc-ng
@@ -48,186 +19,180 @@ python3 server.py --port 8765
 ```
 
 Open [http://127.0.0.1:8765/](http://127.0.0.1:8765/) and leave Terminal running.
-Use Python 3.10 or later and a licensed Stata installation. The smoke packages
-require Stata 16 or later. This Mac's Stata can also be selected explicitly:
+Restart the service after changing Python code. Opening `index.html` directly
+does not start the service. To select Stata explicitly:
 
 ```sh
 python3 server.py --port 8765 --stata "/Applications/StataNow/StataBE.app/Contents/MacOS/StataBE"
 ```
 
-If a service is already running, stop it with Ctrl+C in its Terminal and restart
-it to load code/version changes. Double-clicking `index.html` shows a link and
-startup instructions; package operations require the Python service.
+If the page reports **Service restart required**, the running Python process is
+older than the page. Stop that server with Ctrl+C and restart its original command,
+keeping the same port and data directory. The open page reconnects automatically
+and retains its selected ZIP and form entries. Different ports can run separate
+demo sessions; use the address printed by the server you started.
 
-The public homepage currently links to the legacy SSC submission process. These
-ZIPs target **this local pilot**; preparing them does not submit them to SSC,
-deploy the app, or create a hosted pull request.
+Only run trusted packages: the local Stata runner is not an operating-system
+sandbox. The `sscng_trial` fixtures declare Stata 16; verification used Stata 19.5.
 
-## 3. Upload the two smoke versions
+## Try a real Stata package
 
-Use these finished archives; do not ZIP their containing folders:
+[Download fre 1.2.5 for the demo](trial-package/dist/fre-1.2.5-demo.zip).
+Ben Jann's [fre](https://github.com/benjann/fre) displays frequency tables with
+counts, percentages, and missing values. It has no external package dependencies.
+The ZIP keeps the original command, `.hlp` help, inventory, table of contents, and
+MIT license from the pinned upstream revision. It adds local-trial metadata,
+source/checksum records, and `fre_check.do`, which tests a small generated dataset.
+Use **Read package details**, then follow the confirmation/review/delivery steps
+below. The illustrative submitter contact is for the local trial, not the author.
 
-- [sscng_smoke-1.0.0.zip](smoke-package/dist/sscng_smoke-1.0.0.zip)
-- [sscng_smoke-1.1.0.zip](smoke-package/dist/sscng_smoke-1.1.0.zip)
-
-Both are dependency-free. In **Submit a package**, enter:
-
-| Form field | Value |
-| --- | --- |
-| Package name | `sscng_smoke` |
-| Release version | `1.0.0` for the first ZIP; `1.1.0` for the second |
-| Title | `SSC-NG standalone arithmetic smoke package` |
-| Maintainer | `SSC-NG smoke-package contributors` |
-| Email | `smoke@example.invalid` — an illustrative, non-deliverable contact |
-| Minimum Stata version | `16.0` |
-| License | `MIT` |
-| Dependencies | Leave blank |
-| Release notes | `1.0.0: doubles the input.` or `1.1.0: doubles the input and adds one.` |
-| Package ZIP | The matching ZIP above |
-
-`metadata.json` inside each ZIP provides the exact example metadata. The current
-form does **not** import it automatically; the entered form values are the saved
-submission metadata. The original ZIP bytes remain unchanged.
-
-1. Upload `1.0.0`, confirm trust in this supplied example, then choose
-   **Submit & run checks**.
-2. In **Checks & review**, wait for **Passed**, inspect the log, and approve it.
-   If Stata is unavailable, fix its executable/license setup before approval.
-3. Repeat for `1.1.0`, with the second ZIP and matching version/notes. It requires
-   no helper package. Clear any unfinished revision before starting a new upload.
-4. In **Package history**, select either version. Try **Download release ZIP**,
-   **Compare with previous release**, and **Restore & verify this version**.
-   The restore action shows its checks, uses a separate managed Stata library,
-   and records a successful managed-library selection.
-
-The first version returns `4` for `value(2)`; the second returns `5`. Each smoke
-test also checks zero, negative and fractional input, and the returned version.
-These are arithmetic fixtures for testing the workflow, not statistical methods.
-
-An already approved name/version cannot be overwritten. To repeat the exercise
-from an empty registry while retaining current records, start another instance
-on a different port and with a fresh data directory:
-
-```sh
-python3 server.py --port 8766 --data-dir .sscng/smoke-session-2
-```
-
-Open `http://127.0.0.1:8766/` and use port `8766` in installation URLs as well.
-Choose a new directory for each empty session; do not delete the old archive.
-
-## 4. Pull/download and install a saved version
-
-Here “pull a package” means download/install an archived release. A **pull
-request** is a proposed registry change for review. The current local review
-screen does not create GitHub or Forgejo PRs.
-
-After both approvals, keep the service running. In Stata, install version 1.0.0:
+Once delivered, try it in Stata (use your demo's port):
 
 ```stata
-net install sscng_smoke, from("http://127.0.0.1:8765/packages/sscng_smoke/1.0.0/") replace
-capture program drop sscng_smoke
-sscng_smoke, value(2)
-assert r(result) == 4
+net install fre, from("http://127.0.0.1:8766/archive/f/") replace
+sysuse auto, clear
+fre foreign
 ```
 
-Then install version 1.1.0:
+The table shows domestic and foreign car counts. The supplied check script uses
+generated data, so it does not need to download a dataset. Validation used Stata
+19.5; upstream declares Stata 9.2 or newer.
+
+## Try a submission and an update
+
+Upload these ZIPs directly, without extracting or wrapping them in another ZIP:
+
+- [sscng_trial-1.0.0.zip](trial-package/dist/sscng_trial-1.0.0.zip) — initial trial.
+- [sscng_trial-1.1.0.zip](trial-package/dist/sscng_trial-1.1.0.zip) — optional update.
+
+Both have no dependencies. Metadata fills the form, including the custom
+`sscng_trial_test.do` test. Their installed filenames are unique to this package.
+
+1. In **Submit**, select the `1.0.0` ZIP and click **Read package details**.
+   Review the imported fields. Import does not submit or execute code.
+2. Check the trust box and click **Submit & run checks**. Inspect the results
+   and Stata log in **Checks & review**. Failures include suggested fixes;
+   **Download check reproduction kit** provides a local recipe.
+3. Open **Demo mailbox — no email is sent**, click **Read demo mailbox**, and
+   enter the code under **Confirmation code**. Click **Confirm maintainer**.
+   Keep the illustrative contact `trial@example.invalid` for this walkthrough.
+4. Click **Show changes**, enter a reviewer name and note, then **Approve
+   submission**. Approval leaves the archive unchanged, with delivery pending.
+5. In **Deliver & archive**, inspect **Preview delivery**, then click **Deliver
+   to today's archive**. Successful delivery produces a receipt and a current ZIP.
+6. Choose **Submit update** on the current package, import the `1.1.0` ZIP, and
+   repeat checks, confirmation, review, and delivery. The comparison shows the
+   code, help, tests, and release-note changes.
+
+For requested changes, choose **Create revised submission**. Earlier feedback
+remains visible; each revision needs fresh checks, confirmation, and approval.
+Use **Retry delivery** after resolving a temporary destination failure. A stale
+candidate based on a superseded current package needs a newly reviewed revision.
+
+After delivery, try the command in Stata while the service runs:
 
 ```stata
-net install sscng_smoke, from("http://127.0.0.1:8765/packages/sscng_smoke/1.1.0/") replace
-capture program drop sscng_smoke
-sscng_smoke, value(2)
-assert r(result) == 5
+net install sscng_trial, from("http://127.0.0.1:8765/archive/s/") replace
+capture program drop sscng_trial
+sscng_trial, value(2)
 ```
 
-Repeat the first block to return to the older version. Dropping the loaded
-program makes Stata load the newly installed file. These manual commands replace
-the installed example in Stata's current installation location; the website's
-**Restore & verify** action instead uses a separate pilot library. Stata documents
-this distribution mechanism in its [net manual](https://www.stata.com/manuals/rnet.pdf).
+Version 1.0.0 returns `4`; version 1.1.0 returns `5`. Use the port of your running
+demo, such as `8766`, in the installation URL. These fixtures test the submission
+workflow and arithmetic assertions, not statistical correctness.
 
-## 5. Where the packages and versions are stored
-
-Before upload, the two ZIPs are in:
-
-```text
-/Users/J.J./Dropbox/ssc-ng/smoke-package/dist/
-```
-
-After upload to the default service, the original ZIP is also preserved at:
-
-```text
-/Users/J.J./Dropbox/ssc-ng/.sscng/submissions/<submission-id>/source.zip
-```
-
-Find the submission ID in **Checks & review**. Metadata, release-to-submission
-links, hashes, decisions, and logs are in `.sscng/registry.sqlite3`. Approval
-references the saved submission ZIP instead of copying it again. Both package
-versions survive restarting the service. A different `--data-dir` changes these
-runtime locations.
-
-GitHub holds the application's committed source history. It does not currently
-back up `.sscng/`. The two small smoke ZIPs are included with their source files
-so they can be downloaded directly from the repository. They can be rebuilt with:
+A delivered name/version cannot be submitted again. To repeat from an empty
+registry, choose an unused port and a new data directory:
 
 ```sh
-python3 smoke-package/build.py
+python3 server.py --port 8767 --data-dir .sscng/trial-session-2
 ```
 
-The architecture document explains the next storage design: one object per unique
-ZIP checksum, small version manifests pointing to objects, an independent backup,
-and later file-level deduplication if measured storage needs justify it. Those
-storage improvements and remote GitHub/Dropbox imports are proposals, not features
-implemented by this documentation update.
+## Package and data layout
 
-## 6. Version changes and validation
+The ZIP needs `<name>.pkg`, every file in its inventory, an `.ado` command, a
+`.sthlp` or `.hlp` help file, and an executable `.do` test. `metadata.json` is optional but
+enables form import. `test_file` selects the test; its default is `smoke.do`.
+The pilot accepts `X.Y.Z` versions and exact dependencies already delivered to
+its current archive. These are demo policies, not official SSC requirements.
+ZIP limits are 10 MiB compressed, 30 MiB expanded, and 200 regular files.
 
-**Current local baseline: 0.1.0 — 2026-09-28.** The local working version was reset
-to `0.1.0` at your request. Earlier Git tags named `v0.1.0` and `v0.2.0` remain
-historical checkpoints and were not moved or recreated. This baseline is saved as
-a separate checkpoint; it does not replace either historical tag.
+Delivery writes the `.pkg` and inventory-listed files into the package's first
+letter directory, such as `.sscng/current-archive/s/sscng_trial.ado`. Give
+installed files package-specific names to avoid conflicts. Submission-only
+`metadata.json` can stay outside the `.pkg` inventory. The service manages
+`stata.toc`; do not list it as an installed file.
 
-| Change | What it provides |
+| Location | Purpose |
 | --- | --- |
-| Consolidated documents | One instruction/change record and one architecture reference aligned with the published plan |
-| Two new standalone package versions | Direct ZIP upload and visible older/newer installation results, without a helper dependency |
-| One application version source | API and server label now read `VERSION` |
-| Architecture decisions | Original-source references plus captured files; neutral intake; proposed deduplication; GitHub-independent review/storage and recovery |
-| Preserved local entry fix | Relative asset paths and startup guidance when opening `index.html` directly |
+| `server.py`, `pilot/` | Submission service, checks, review, and delivery |
+| `index.html`, `assets/` | Three-step interface |
+| `trial-package/` | Upload ZIPs, source files, builder, and checksums |
+| `examples/` | Built-in examples and dependency fixtures used by the demo/tests |
+| `tests/` | Regression tests, browser smoke test, and real-Stata integration |
+| `docs/ARCHITECTURE.md` | Handoff contract, recovery, and production boundaries |
+| `.sscng/` | Saved local data; excluded from Git |
 
-**2026-09-29 — GitHub checkpoint packaging (version remains 0.1.0).** At your
-request, include both ready-to-upload smoke ZIPs in the repository using two
-specific `.gitignore` exceptions, and update this file to describe their location.
-The ZIPs and manifest match a deterministic rebuild. No registry data migration
-is needed; `.sscng/` remains excluded from Git.
+The data root contains `registry.sqlite3`, original ZIPs under `submissions/`,
+check workspaces under `jobs/`, current output under `current-archive/`, and
+temporary delivery recovery records under `delivery-journals/`. `--data-dir`
+selects another root. Existing submissions and legacy records are preserved;
+old approvals are not automatically delivered. Historical archive management
+and maintainer transfers are outside this service.
 
-Historical context retained from the removed changelog: the original `v0.1.0`
-checkpoint was a browser-only prototype with simulated checks. The historical
-`v0.2.0` checkpoint introduced the Python service, real Stata checks, persistent
-records, exact dependencies, archived installs/restores, catalog captures, and
-operator-recorded maintainer transfers. Those implemented capabilities remain.
-
-Validation on 2026-09-28: all 34 application regression tests passed. Both new
-ZIPs passed validation and real Stata 19.5 checks through a temporary HTTP
-registry. Approval, byte-identical archive downloads, and actual Stata `net install`
-passed for both versions. Restoring `1.0.0` after approving `1.1.0` also passed.
-These checks used separate temporary data and left the saved demo records intact.
-Repeated builds matched the ZIPs and hashes in `smoke-package/dist/manifest.json`.
-The example declares Stata 16 as its minimum; this run tested Stata 19.5 only.
-
-To rerun the application's regression suite or its older dependency integration
-exercise:
+## Validation and production boundary
 
 ```sh
+python3 trial-package/build.py --check
 python3 -m unittest discover -s tests -p 'test_*.py'
 python3 tests/stata_integration.py
 ```
 
-For every future application version, add a dated entry here recording **what
-changed, affected files, validation, and any data migration**. Update `VERSION`
-when choosing that version. Keep package release numbers separate from the
-application version. A future Git commit/tag/push requires your explicit request;
-choose an unused tag rather than overwriting a historical checkpoint.
+Rebuild the trial ZIPs after editing their sources with
+`python3 trial-package/build.py`. The final integration command executes only
+trusted repository fixtures in temporary registries and requires licensed Stata.
 
-Only execute trusted packages on this Mac: the local runner is not a security
-sandbox. The smoke package has its own MIT license; this does not assign a new
-license to the SSC-NG application as a whole.
+The mailbox is simulated and reviewer names are locally entered. A production
+system needs real identity verification, isolated workers for untrusted code,
+and an agreed live archive destination. The local handoff bundle, delivery
+receipts, retries, and interrupted-write recovery are implemented. Details and
+the CRAN, Bioconductor, and Homebrew references are in
+[the architecture notes](docs/ARCHITECTURE.md).
+
+## Dated changes
+
+- **2026-10-05 — submission demo checkpoint.** Preserved the previous published
+  source at commit `43ba913` with the tag `pre-submission-demo-2026-10-05`.
+  To revisit it from a clean working tree, run
+  `git switch -c revisit-previous-demo pre-submission-demo-2026-10-05`.
+  The checkpoint covers project files; local `.sscng/` data remains outside Git.
+- **2026-10-05 — real-package trial.** Added Ben Jann's `fre` 1.2.5 with unchanged
+  upstream files and license, a pinned source manifest, local-trial metadata, and
+  numeric/string/missing-value/filter checks. The validator now accepts Stata's
+  older `.hlp` format as well as `.sthlp`. Validation: all 80 regression tests and
+  reproducible ZIP checks passed. Real Stata 19.5 passed the package assertions,
+  confirmation/approval/delivery, and installation from the current HTTP archive
+  in a temporary registry. The live demos retain no `fre` submission, ready for
+  the user's trial.
+- **2026-10-05 — fix package-detail import on stale servers.** Added an API
+  compatibility check before enabling requests and a clear restart message.
+  Refreshed the old server on 8765 and the preview on 8766 with their existing
+  data. Verified ZIP import and automatic reconnection in the browser; all 79
+  regression tests passed and saved records were unchanged.
+- **2026-10-05 — cleanup.** Removed obsolete archive/transfer operations and
+  versioned installation routes, redundant smoke packages, a static-site marker,
+  generated logs/caches, and duplicated documentation. Kept saved data and trial
+  packages. Validation: all 79 regression tests, real Stata 19.5 integration,
+  trial ZIP build checks, and whitespace checks passed. The refreshed preview
+  retained the same submissions, current packages, and recorded maintainers.
+- **2026-10-05 — trial packages.** Added `sscng_trial` 1.0.0 and 1.1.0. Both
+  passed metadata import, real Stata 19.5 checks, confirmation, approval, and
+  delivery alongside an existing package in a temporary registry.
+- **2026-10-04 — submission workflow.** Added metadata import, demo confirmation,
+  actionable checks, review comparisons, separate delivery, receipts, retries,
+  and recovery. The 79-test suite and Stata 19.5 integration passed at that point.
+- **2026-09-28–29 — baseline.** Set the application label to 0.1.0 and supplied
+  reproducible example packages. Earlier Git tags remain unchanged.
+
+Application version remains 0.1.0. The trial package's MIT license does not assign
+a license to the application as a whole.

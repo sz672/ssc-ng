@@ -1,0 +1,13 @@
+{
+  "name": "fre",
+  "version": "1.2.5",
+  "title": "One-way frequency tables (Ben Jann's fre)",
+  "maintainer": "SSC-NG local trial submitter (upstream author: Ben Jann)",
+  "email": "trial@example.invalid",
+  "stata": "9.2",
+  "license": "MIT",
+  "dependencies": [],
+  "test_file": "fre_check.do",
+  "source_url": "https://github.com/benjann/fre",
+  "notes": "Local trial of the real fre 1.2.5 package by Ben Jann, pinned to upstream commit f90bd6741423b847349c3106da12fc12c174330c. Original command, help, inventory, table of contents, and MIT license are unchanged. Added this demo metadata, SOURCE.json, and fre_check.do with numeric, string, missing-value, and filter assertions. This is a local test submission, not a submission or endorsement by the upstream author."
+}

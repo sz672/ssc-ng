@@ -30,8 +30,27 @@ NAME_RE = re.compile(r"[a-z][a-z0-9_]{0,31}\Z")
 VERSION_RE = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\Z")
 
 
-def _check(name: str, passed: bool, detail: str) -> dict:
-    return {"name": name, "status": "passed" if passed else "failed", "detail": detail}
+def _check(name: str, passed: bool, detail: str, *, code: str | None = None,
+           remedy: str | None = None, severity: str | None = None) -> dict:
+    """Stable machine-readable results with a concrete next step for authors."""
+    remedies = {
+        "Metadata": "Correct the named field in the submission form and upload a revision.",
+        "ZIP safety": "Rebuild a ZIP with regular files and relative paths, at most 200 files, 10 MiB compressed and 30 MiB expanded.",
+        "Package structure": "Match the package name to its root .pkg, include every listed ado/help file, and provide the selected executable .do test.",
+        "Declared version": "Make the submitted version and each explicit 'd Version:' record in the .pkg agree, then upload a revision.",
+        "Dependency validation": "Supply valid, distinct dependency packages at the declared exact versions before rerunning checks.",
+        "Stata runtime": "Ask the operator to configure SSCNG_STATA with a working licensed Stata executable, then rerun checks.",
+        "Minimum Stata version": "Run on the highest minimum Stata version required by the candidate and its dependencies; adjust the requirement only if the code supports it.",
+        "Example execution": "Open the Stata log at the first error, fix the selected .do test or package, and rerun using the reproduction download.",
+        "Job completion": "Inspect the first failed check and Stata log; fix that error or a hanging test before rerunning.",
+    }
+    if remedy is None:
+        remedy = ("Check the .pkg inventory and installed dependencies; reproduce net install in a fresh Stata library."
+                  if name.startswith("Install ") else remedies.get(name, "Correct the reported issue and inspect the upload again."))
+    return {"name": name, "status": "passed" if passed else "failed", "detail": detail,
+            "code": code or re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_"),
+            "severity": severity or ("info" if passed else "error"),
+            "remedy": "" if passed else remedy}
 
 
 def _safe_path(value: str) -> str:
@@ -130,6 +149,12 @@ def _metadata_error(metadata: dict) -> str | None:
         return "Provide a valid maintainer email address."
     if not re.fullmatch(r"[0-9]{1,2}(?:\.[0-9]{1,2})?", metadata["stata"]):
         return "Minimum Stata version must be numeric, for example 16.0."
+    test_file = metadata.get("test_file", "smoke.do")
+    try:
+        if not isinstance(test_file, str) or not _safe_path(test_file).endswith(".do"):
+            return "Test file must be a safe package-relative .do path, for example tests/check.do."
+    except ValueError:
+        return "Test file must be a safe package-relative .do path, for example tests/check.do."
     dependencies = metadata.get("dependencies")
     if not isinstance(dependencies, list) or len(dependencies) > 50:
         return "Dependencies must be a list of at most 50 exact name/version records."
@@ -185,6 +210,32 @@ def _manifest_files(content: bytes) -> list[str]:
     return files
 
 
+def _manifest_values(content: bytes) -> dict[str, set[str]]:
+    """Read explicit description headers before the optional end record."""
+    if len(content) > 1024 * 1024:
+        return {}
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return {}
+    values: dict[str, set[str]] = {}
+    labels = {"title": "title", "version": "version", "stata": "stata",
+              "stata version": "stata", "requires stata": "stata"}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line == "e" or line.startswith("e "):
+            break
+        match = re.fullmatch(r"d\s+([^:]+):\s*(.+)", line, flags=re.IGNORECASE)
+        if match and (field := labels.get(match.group(1).strip().lower())):
+            values.setdefault(field, set()).add(match.group(2).strip())
+    return values
+
+
+def _manifest_hints(content: bytes) -> dict[str, str]:
+    """Read explicit, unambiguous description headers; never guess from prose."""
+    return {field: next(iter(items)) for field, items in _manifest_values(content).items() if len(items) == 1}
+
+
 def validate_bundle(zip_bytes: bytes, metadata: dict) -> dict:
     """Validate metadata and package inventory without executing source files."""
     checks = []
@@ -207,19 +258,29 @@ def validate_bundle(zip_bytes: bytes, metadata: dict) -> dict:
         if inventory not in files:
             raise ValueError(f"Missing root package inventory: {inventory}")
         listed = _manifest_files(files[inventory])
+        if any(name.split("/", 1)[0].casefold() == "stata.toc" for name in listed):
+            raise ValueError("stata.toc is maintained by the submission service; remove it and paths inside it from the package inventory.")
         missing = [name for name in listed if name not in files]
         if missing:
             raise ValueError("Inventory references missing files: " + ", ".join(missing))
         if not any(name.endswith(".ado") for name in listed):
             raise ValueError("Inventory must list at least one .ado source file.")
-        if not any(name.endswith(".sthlp") for name in listed):
-            raise ValueError("Inventory must list at least one .sthlp help file.")
-        if "smoke.do" not in files:
-            raise ValueError("Include a smoke.do example at the package root.")
+        if not any(name.endswith((".sthlp", ".hlp")) for name in listed):
+            raise ValueError("Inventory must list at least one .sthlp or .hlp help file.")
+        test_file = metadata.get("test_file", "smoke.do")
+        if test_file not in files:
+            raise ValueError(f"Missing executable test: {test_file}. Include that .do file or select another package-relative test file in the submission form.")
     except ValueError as exc:
         checks.append(_check("Package structure", False, str(exc)))
         return result
-    checks.append(_check("Package structure", True, f"{inventory} lists {len(listed)} existing files; ado, help, and smoke.do are present."))
+    checks.append(_check("Package structure", True, f"{inventory} lists {len(listed)} existing files; ado, help, and {test_file} are present."))
+    declared_versions = _manifest_values(files[inventory]).get("version")
+    if declared_versions:
+        agrees = declared_versions == {metadata["version"]}
+        checks.append(_check("Declared version", agrees,
+                             f"Inventory declares {', '.join(sorted(declared_versions))}; submission declares {metadata['version']}."))
+        if not agrees:
+            return result
     result["passed"] = True
     return result
 
@@ -283,7 +344,7 @@ def _read_log(path: Path) -> str:
 def run_stata(zip_bytes: bytes, metadata: dict,
               dependency_bundles: list[tuple[dict, bytes]], work_dir: Path,
               stata_path: str | None, timeout: int = 60) -> dict:
-    """Install trusted packages into a fresh library and execute smoke.do.
+    """Install trusted packages into a fresh library and execute the selected test.
 
     The process uses official BASE plus job-local PLUS/PERSONAL/SITE only.
     Jobs and installed libraries are retained. An unavailable runtime never
@@ -358,7 +419,7 @@ def run_stata(zip_bytes: bytes, metadata: dict,
     candidate_source = job / "source" / str(len(packages) - 1)
     lines += [f"cd {_stata_path(candidate_source)}",
               'global S_ADO "BASE;PLUS;PERSONAL;SITE"',
-              f"capture noisily do {_stata_path(candidate_source / 'smoke.do')}",
+              f"capture noisily do {_stata_path(candidate_source / metadata.get('test_file', 'smoke.do'))}",
               "local sscng_rc = _rc", f'display "{marker}" `sscng_rc\'',
               "if `sscng_rc' != 0 exit `sscng_rc'", f'display "{token}_COMPLETE"',
               "log close sscng", "exit, clear"]

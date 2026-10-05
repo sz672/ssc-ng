@@ -1,4 +1,4 @@
-"""Regression coverage for catalog ordering, input errors, and dependency graphs."""
+"""Regression coverage for input errors, current delivery, and dependency graphs."""
 
 import base64
 from concurrent.futures import ThreadPoolExecutor
@@ -37,7 +37,14 @@ class ServiceEdgesTest(unittest.TestCase):
         return self.registry.get("submissions", submission["id"])
 
     def approve(self, submission):
-        return self.registry.review(submission["id"], {"decision": "approve"})
+        record = self.registry.get("submissions", submission["id"])
+        if record.get("confirmation", {}).get("status") != "verified":
+            message = next(m for m in self.registry.demo_mailbox()["messages"] if m["submission_id"] == submission["id"])
+            self.registry.confirm(submission["id"], {"code": message["code"]})
+        self.registry.review(submission["id"], {"decision": "approve", "reviewer": "Test reviewer", "note": "Reviewed test fixture"})
+        result = self.registry.deliver(submission["id"])
+        self.assertEqual("delivered", result["delivery"]["status"], result["delivery"].get("error"))
+        return result
 
     def catalog_release(self, name, version, dependencies=()):
         """Seed dependency-only catalog fixtures, including otherwise unreachable cycles."""
@@ -49,23 +56,15 @@ class ServiceEdgesTest(unittest.TestCase):
             db.execute("INSERT INTO releases(id,name,version,value) VALUES(?,?,?,?)",
                        (record["id"], name, version, json.dumps(record)))
 
-    def test_old_release_published_later_does_not_replace_latest_or_reverse_diff(self):
+    def test_old_release_cannot_replace_todays_current_package(self):
         self.approve(self.submit("sscng-helper-0.1.0"))
         self.approve(self.submit("sscng-example-1.1.0"))
-        self.approve(self.submit("sscng-example-1.0.0"))
-        snapshot = self.registry.snapshot()
-        current = next(item for item in snapshot["packages"] if item["name"] == "sscng_example")
+        older = self.submit("sscng-example-1.0.0")
+        with self.assertRaisesRegex(APIError, "newer version"):
+            self.approve(older)
+        current = next(item for item in self.registry.archive_state()["packages"] if item["name"] == "sscng_example")
         self.assertEqual("1.1.0", current["version"])
-        self.assertIsNone(self.registry.diff("sscng_example", "1.0.0")["previous_version"])
-        newer_diff = self.registry.diff("sscng_example", "1.1.0")
-        self.assertEqual("1.0.0", newer_diff["previous_version"])
-        self.assertIn("sscng_example.ado", [item["path"] for item in newer_diff["changed"]])
-
-    def test_catalog_uses_numeric_version_order(self):
-        self.catalog_release("example", "1.10.0")
-        self.catalog_release("example", "1.2.0")
-        snapshot = self.registry.snapshot()
-        self.assertEqual("1.10.0", snapshot["packages"][0]["version"])
+        self.assertEqual("passed", self.registry.get("submissions", older["id"])["status"])
 
     def test_malformed_optional_submission_ids_return_validation_errors(self):
         for key in ("parent_id", "source_submission_id"):

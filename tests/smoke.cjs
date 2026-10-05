@@ -1,8 +1,8 @@
 /* Optional, read-only browser smoke test against a running SSC-NG local service.
  * Start the backend first: python3 server.py --port 8765
  * Run: SSCNG_BASE_URL=http://127.0.0.1:8765 node tests/smoke.cjs
- * Works with either a fresh or an already populated registry. Never submits,
- * approves, restores, captures, or transfers a package.
+ * Works with either a fresh or an already populated submission demo.
+ * Never submits or approves a package.
  */
 'use strict';
 const assert = require('node:assert/strict');
@@ -34,12 +34,16 @@ async function main() {
     });
     const loadedState = page.waitForResponse(response => new URL(response.url()).pathname === '/api/state' && response.status() === 200);
     await page.goto(baseURL.href);
-    await loadedState;
+    const serviceState = await (await loadedState).json();
+    assert.equal(serviceState.api_revision, 1, 'The running service must support the page’s API revision.');
     await page.locator('#sg-service-status').filter({hasText: 'Local service online'}).waitFor();
     assert.equal(await page.locator('#sg-connection-error').isHidden(), true);
     assert.match(await page.locator('#sg-stata-status').textContent(), /Stata executable found|Stata unavailable/);
     assert.equal(await page.locator('#sg-trusted').isChecked(), false, 'Code execution needs explicit trust.');
     assert.equal(await page.locator('#sg-file').getAttribute('type'), 'file');
+    assert.equal(await page.getByRole('button', {name:'Read package details',exact:true}).count(), 1);
+    assert.equal(await page.locator('#sg-test_file').inputValue(), 'smoke.do');
+    assert.equal(await page.locator('#sg-source_url').getAttribute('type'), 'url');
     assert.equal(await page.locator('#sg-license').inputValue(), 'Unspecified');
     assert.ok(await page.locator('#sg-example option').count() > 0, 'Examples must be listed.');
     assert.equal(await page.locator('#sg-example-run').isEnabled(), true);
@@ -47,9 +51,10 @@ async function main() {
     const tabs = [
       ['submit', '1 · Submit'],
       ['review', '2 · Checks & review'],
-      ['history', '3 · Package history'],
-      ['records', '4 · Registry records'],
+      ['archive', '3 · Deliver & archive'],
     ];
+    assert.equal(await page.getByRole('tab').count(), 3, 'Submission, review, and current archive are the only workspaces.');
+    assert.equal(await page.locator('#sg-history, #sg-records').count(), 0, 'Archive history and registry management are outside this demo.');
     for (const viewport of [{width:1060,height:1250},{width:375,height:1200}]) {
       await page.setViewportSize(viewport);
       for (const [id, name] of tabs) {
@@ -64,19 +69,29 @@ async function main() {
       }
     }
 
+    assert.match(await page.locator('#sg-archive').innerText(), /Archive history and versioning are handled by the existing/);
+    assert.match(await page.locator('#sg-archive').innerText(), /not connected to the production archive/);
+    assert.match(await page.locator('#sg-archive').innerText(), /Delivery queue/);
+    assert.match(await page.locator('#sg-archive').innerText(), /Current packages/);
+    assert.equal(await page.locator('#sg-archive a[href="https://github.com/ssc-ng/archive/"]').count(), 1);
+    assert.equal(await page.locator('[data-action="restore"], [data-action="load-diff"], [data-action="capture"], #sg-transfer-form').count(), 0);
+    for (const link of await page.locator('#sg-archive .sg-link-button').all()) {
+      assert.match(await link.getAttribute('href'), /^\/api\/(archive\/[a-z][a-z0-9_]*\/download|submissions\/[A-Za-z0-9_-]+\/(handoff|receipt))$/, 'Downloads refer to package handoffs, receipts, or current archive packages.');
+    }
+
     // Keyboard tab navigation should expose the corresponding workspace.
     await page.getByRole('tab', {name:'1 · Submit', exact:true}).focus();
     await page.keyboard.press('Home');
     await page.keyboard.press('ArrowRight');
     assert.equal(await page.locator('#sg-tab-review').getAttribute('aria-selected'), 'true');
     await page.keyboard.press('End');
-    assert.equal(await page.locator('#sg-tab-records').getAttribute('aria-selected'), 'true');
+    assert.equal(await page.locator('#sg-tab-archive').getAttribute('aria-selected'), 'true');
     await page.emulateMedia({colorScheme:'dark'});
     await page.getByRole('tab', {name:'1 · Submit', exact:true}).click();
     assert.equal(await page.locator('#sg-submit').isVisible(), true);
     assert.deepEqual(writes, [], 'The read-only smoke test must not send mutations.');
     assert.deepEqual(errors, [], 'No browser errors.');
-    console.log('Read-only UI checks passed on desktop and mobile. Registry records were not changed.');
+    console.log('Read-only submission UI checks passed on desktop and mobile. No packages were changed.');
   } finally {
     await browser.close();
   }

@@ -66,6 +66,19 @@ class ValidationTests(unittest.TestCase):
                 del files[path]
                 self.assertFalse(packages.validate_bundle(archive(files), METADATA)["passed"])
 
+    def test_legacy_help_is_accepted_and_must_be_listed_in_inventory(self):
+        files = dict(FILES)
+        files["sample.hlp"] = files.pop("sample.sthlp")
+        files["sample.pkg"] = files["sample.pkg"].replace(b"sample.sthlp", b"sample.hlp")
+        result = packages.validate_bundle(archive(files), METADATA)
+        self.assertTrue(result["passed"], result)
+        help_record = next(item for item in result["files"] if item["path"] == "sample.hlp")
+        self.assertEqual(hashlib.sha256(FILES["sample.sthlp"]).hexdigest(), help_record["sha256"])
+        files["sample.pkg"] = files["sample.pkg"].replace(b"f sample.hlp\n", b"")
+        result = packages.validate_bundle(archive(files), METADATA)
+        self.assertFalse(result["passed"], "Help in the ZIP must also be listed for installation.")
+        self.assertIn(".sthlp or .hlp", result["checks"][-1]["detail"])
+
     def test_manifest_requires_real_f_records_and_version(self):
         for content in (b"sample.ado\nsample.sthlp", b"v 2\nf sample.ado\n",
                         b"v 3\nf ../sample.ado\n", b"v 3\nf https://example.org/sample.ado\n",
@@ -76,6 +89,32 @@ class ValidationTests(unittest.TestCase):
     def test_manifest_supports_comments_tabs_and_optional_end(self):
         content = b"* comment\n\nv 3\nd\nf\tsample.ado\nf sample.sthlp\ne\nf ignored.txt\n"
         self.assertTrue(packages.validate_bundle(archive({**FILES, "sample.pkg": content}), METADATA)["passed"])
+
+    def test_explicit_inventory_version_must_match_the_submitted_version(self):
+        files = {**FILES, "sample.pkg": b"v 3\nd Version: 2.0.0\nf sample.ado\nf sample.sthlp\n"}
+        result = packages.validate_bundle(archive(files), METADATA)
+        self.assertFalse(result["passed"])
+        check = result["checks"][-1]
+        self.assertEqual(check["code"], "declared_version")
+        self.assertEqual(check["severity"], "error")
+        self.assertIn("2.0.0", check["detail"])
+        self.assertIn("agree", check["remedy"])
+        files["sample.pkg"] += b"d Version: 1.0.0\n"
+        self.assertFalse(packages.validate_bundle(archive(files), METADATA)["passed"],
+                         "Conflicting declarations must not bypass the version check.")
+
+    def test_custom_example_path_is_validated_and_missing_tests_are_actionable(self):
+        files = {name: data for name, data in FILES.items() if name != "smoke.do"}
+        files["tests/check.do"] = b"sample\nassert 1 == 1\n"
+        metadata = {**METADATA, "test_file": "tests/check.do"}
+        self.assertTrue(packages.validate_bundle(archive(files), metadata)["passed"])
+        result = packages.validate_bundle(archive(files), METADATA)
+        self.assertFalse(result["passed"])
+        self.assertIn("smoke.do", result["checks"][-1]["detail"])
+        self.assertIn("select another", result["checks"][-1]["detail"])
+        for unsafe in ("../check.do", "$check.do", "tests/check.txt", "x\\check.do", None):
+            with self.subTest(unsafe=unsafe):
+                self.assertFalse(packages.validate_bundle(archive(files), {**metadata, "test_file": unsafe})["passed"])
 
     def test_traversal_absolute_macro_and_windows_paths_fail(self):
         for path in ("../escaped", "/absolute", "C:/windows", "a\\b", "a/../b", "a/$x.ado"):
@@ -177,6 +216,18 @@ class RunnerTests(unittest.TestCase):
             result = self.run_fake(temporary, "failed")
             self.assertEqual(result["status"], "failed")
             self.assertTrue(any("r(9)" in check["detail"] for check in result["checks"]))
+
+    def test_runner_executes_the_validated_custom_example_path(self):
+        files = {name: data for name, data in FILES.items() if name != "smoke.do"}
+        files["tests/check.do"] = b"sample\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.object(packages.subprocess, "Popen", side_effect=self.fake_process()):
+                result = packages.run_stata(archive(files), {**METADATA, "test_file": "tests/check.do"},
+                                            [], Path(temporary), sys.executable)
+            self.assertEqual(result["status"], "passed", result)
+            runner = next(Path(temporary).glob("stata-*/runner.do")).read_text()
+            self.assertIn('/source/0/tests/check.do"', runner)
+            self.assertNotIn("/smoke.do", runner)
 
     def test_echoed_commands_cannot_count_as_completion(self):
         with tempfile.TemporaryDirectory() as temporary:

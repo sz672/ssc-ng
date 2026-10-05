@@ -7,8 +7,8 @@ import binascii
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timezone
-import difflib
 import hashlib
+import io
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
@@ -17,11 +17,17 @@ import sqlite3
 import threading
 from urllib.parse import unquote, urlsplit
 import uuid
+import zipfile
 
-from .packages import bundle_files, discover_stata, run_stata, validate_bundle
+from .packages import discover_stata, run_stata, validate_bundle, _safe_path
+from .archive import safe_destination, toc
+from .workflow import WorkflowMixin
+from .delivery import DeliveryMixin
+from .intake import inspect_upload, check_reproduction
 
 ROOT = Path(__file__).resolve().parent.parent
 APP_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+API_REVISION = 1
 NAME = re.compile(r"[a-z][a-z0-9_]{0,31}\Z")
 VERSION = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\Z")
 
@@ -32,10 +38,6 @@ def now():
 
 def encoded(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
-
-
-def version_key(release):
-    return tuple(int(part) for part in release["version"].split("."))
 
 
 class APIError(ValueError):
@@ -72,14 +74,33 @@ def metadata_checked(value):
         seen.add(dep["name"])
         result["dependencies"].append({"name": dep["name"], "version": dep["version"]})
     result["dependencies"].sort(key=lambda dep: dep["name"])
+    if value.get("test_file"):
+        if not isinstance(value["test_file"], str):
+            raise APIError("Test file must be a safe path inside the ZIP.")
+        try:
+            test_file = _safe_path(value["test_file"])
+        except (ValueError, TypeError):
+            raise APIError("Test file must be a safe path inside the ZIP.") from None
+        if not test_file.endswith(".do"):
+            raise APIError("Choose a .do file for the executable example.")
+        result["test_file"] = test_file
+    if value.get("source_url"):
+        source_url = value["source_url"]
+        if not isinstance(source_url, str) or len(source_url) > 2000:
+            raise APIError("Provide a valid public project URL.")
+        url = urlsplit(source_url)
+        if url.scheme not in ("https", "http") or not url.hostname or url.username or url.password:
+            raise APIError("Project URL must use HTTP(S) without embedded credentials.")
+        result["source_url"] = source_url
     return result
 
 
-class Registry:
+class Registry(WorkflowMixin, DeliveryMixin):
     def __init__(self, data_dir, stata_path=None, runner=run_stata):
         self.data = Path(data_dir).resolve()
         self.data.mkdir(parents=True, exist_ok=True)
         self.db_path = self.data / "registry.sqlite3"
+        self.current_archive = self.data / "current-archive"
         self.lock = threading.RLock()
         self.stata_lock = threading.Lock()
         self.runner = runner
@@ -91,15 +112,15 @@ class Registry:
                 CREATE TABLE IF NOT EXISTS submissions(id TEXT PRIMARY KEY, value TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS releases(id TEXT PRIMARY KEY, name TEXT NOT NULL, version TEXT NOT NULL, value TEXT NOT NULL, UNIQUE(name,version));
                 CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT, kind TEXT, message TEXT);
-                CREATE TABLE IF NOT EXISTS snapshots(id TEXT PRIMARY KEY, value TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS transfers(id TEXT PRIMARY KEY, value TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS mailbox(id TEXT PRIMARY KEY, submission_id TEXT NOT NULL, value TEXT NOT NULL);
             """)
         # An interrupted process never leaves a candidate looking checked.
         for submission in self.rows("submissions"):
             if submission["status"] in ("queued", "running"):
                 submission.update(status="unavailable", log="The service stopped before checks completed. Submit a new revision to retry.")
                 self.save("submissions", submission)
+        self.recover_deliveries()
         from examples.build_examples import build_all
         self.examples = build_all(self.data / "examples")
 
@@ -152,17 +173,53 @@ class Registry:
             db.execute("INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)", (key, encoded(value)))
 
     def state(self, base_url):
-        releases = self.rows("releases")
-        for release in releases:
-            release["install_url"] = f"{base_url}/packages/{release['name']}/{release['version']}/"
-            release["download_url"] = f"/api/releases/{release['name']}/{release['version']}/download"
-        with self.connect() as db:
-            events = [dict(zip(("id", "created_at", "kind", "message"), row)) for row in db.execute("SELECT id,created_at,kind,message FROM events ORDER BY id DESC LIMIT 200")]
-        return {"version": APP_VERSION, "stata": {"available": bool(self.stata_path), "path": self.stata_path},
-                "submissions": self.rows("submissions"), "releases": releases, "events": events,
-                "snapshots": self.rows("snapshots"), "transfers": self.rows("transfers"),
-                "environment": self.setting("environment"),
-                "examples": [{k: e[k] for k in ("id", "label", "metadata")} for e in self.examples]}
+        with self.lock:
+            return {"version": APP_VERSION, "api_revision": API_REVISION,
+                    "stata": {"available": bool(self.stata_path), "path": self.stata_path},
+                    "submissions": [self.public_submission(item) for item in self.rows("submissions")],
+                    "archive": self.archive_state(base_url), "handoff": self.handoff_state(), "owners": self.owners(),
+                    "examples": [{k: e[k] for k in ("id", "label", "metadata")} for e in self.examples]}
+
+    def archive_state(self, base_url=""):
+        with self.lock:
+            packages = self.setting("current_archive") or {}
+            items = []
+            for name, item in sorted(packages.items()):
+                items.append({**item, "install_url": f"{base_url}/archive/{name[0]}/",
+                              "download_url": f"/api/archive/{name}/download"})
+            return {"root": str(self.current_archive), "mode": "local", "packages": items}
+
+    def archive_file(self, relative):
+        with self.lock:
+            packages = self.setting("current_archive") or {}
+            expected = None
+            if re.fullmatch(r"[a-z]/stata\.toc", relative) and any(name[0] == relative[0] for name in packages):
+                expected = hashlib.sha256(toc(packages, relative[0])).hexdigest()
+            else:
+                for item in packages.values():
+                    if relative in item["file_hashes"]:
+                        expected = item["file_hashes"][relative]
+                        break
+            if expected is None:
+                raise APIError("Current archive file not found.", 404)
+            try:
+                data = safe_destination(self.current_archive, relative).read_bytes()
+            except (ValueError, OSError) as error:
+                raise APIError(f"Current archive file is unavailable: {error}", 409) from None
+            if hashlib.sha256(data).hexdigest() != expected:
+                raise APIError("Current archive checksum does not match the approved file.", 409)
+            return data
+
+    def archive_download(self, name):
+        with self.lock:
+            item = (self.setting("current_archive") or {}).get(name)
+            if not item:
+                raise APIError("Current package not found.", 404)
+            output = io.BytesIO()
+            with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+                for relative in item["files"]:
+                    archive.writestr(relative.split("/", 1)[1], self.archive_file(relative))
+            return output.getvalue()
 
     def zip_for(self, submission):
         path = self.data / "submissions" / submission["id"] / "source.zip"
@@ -197,26 +254,42 @@ class Registry:
         sha256 = hashlib.sha256(zip_bytes).hexdigest()
         fingerprint = hashlib.sha256((sha256 + encoded(metadata)).encode()).hexdigest()
         with self.lock:
+            owner = self.owner_for(metadata["name"])
+            if owner and owner["email"].casefold() != metadata["email"].casefold():
+                raise APIError("This package already has a recorded maintainer. Use that maintainer's email; ownership changes need operator review.", 409)
             if any(r["name"] == metadata["name"] and r["version"] == metadata["version"] for r in self.rows("releases")):
                 raise APIError("That package version is already published. Choose a new version.", 409)
             parent_id = body.get("parent_id")
+            current = (self.setting("current_archive") or {}).get(metadata["name"])
+            base_id = current["submission_id"] if current else None
+            if any(s["name"] == metadata["name"] and s["version"] == metadata["version"] and s["status"] == "approved" and s["id"] != parent_id for s in self.rows("submissions")):
+                raise APIError("That package version already has an approved submission. Deliver it or revise it before submitting again.", 409)
             if parent_id:
                 parent = self.get("submissions", parent_id)
                 if parent["name"] != metadata["name"]:
                     raise APIError("A revision must keep the same package name.")
-                if parent["status"] in ("queued", "running", "approved"):
+                revisable_approval = parent["status"] == "approved" and parent.get("delivery", {}).get("status") in ("pending", "failed")
+                if parent["status"] in ("queued", "running", "superseded") or (parent["status"] == "approved" and not revisable_approval):
                     raise APIError("Only a completed, unpublished submission can be revised.", 409)
-                if parent["fingerprint"] == fingerprint and parent["status"] not in ("failed", "unavailable"):
+                if parent["fingerprint"] == fingerprint and parent["status"] not in ("failed", "unavailable") and parent.get("base_submission_id") == base_id:
                     raise APIError("Change the package files or metadata before submitting a revision.", 409)
             identifier = uuid.uuid4().hex
             folder = self.data / "submissions" / identifier
             folder.mkdir(parents=True)
             (folder / "source.zip").write_bytes(zip_bytes)
             submission = {"id": identifier, "parent_id": parent_id, "name": metadata["name"], "version": metadata["version"],
+                          "base_submission_id": base_id, "kind": "update" if owner or current else "new",
                           "metadata": metadata, "sha256": sha256, "fingerprint": fingerprint, "created_at": now(),
                           "status": "queued" if validation["passed"] else "failed", "checks": validation["checks"],
                           "files": validation["files"], "log": "", "review_note": "", "dependency_releases": []}
             self.save("submissions", submission)
+            if parent_id:
+                parent["superseded_by"] = identifier
+                if parent["status"] == "approved":
+                    parent["status"] = "superseded"
+                    parent["delivery"]["status"] = "cancelled"
+                self.save("submissions", parent)
+            submission = self.request_confirmation(identifier)
             self.event("submission", f"Submitted {submission['name']}@{submission['version']} ({identifier[:8]}).")
             if validation["passed"]:
                 self.futures.append(self.executor.submit(self.check, identifier))
@@ -250,18 +323,26 @@ class Registry:
         return ordered
 
     def check(self, identifier):
-        submission = self.get("submissions", identifier)
-        submission["status"] = "running"
-        self.save("submissions", submission)
+        with self.lock:
+            submission = self.get("submissions", identifier)
+            submission["status"] = "running"
+            self.save("submissions", submission)
         try:
             try:
                 deps = self.dependencies(submission["metadata"])
+                published = self.setting("current_archive") or {}
+                for dep in deps:
+                    current = published.get(dep["name"])
+                    if not current or current["submission_id"] != dep["submission_id"]:
+                        raise APIError(f"Dependency {dep['name']}@{dep['version']} is not the version delivered to today's archive.")
+                    for relative in current["files"]:
+                        self.archive_file(relative)
             except APIError as error:
-                submission["checks"].append({"name": "Dependencies", "status": "failed", "detail": str(error)})
+                submission["checks"].append({"name": "Dependencies", "status": "failed", "severity": "error", "code": "dependency-resolution", "detail": str(error), "remedy": "Deliver each declared dependency first, or correct its exact package name and version, then submit a revision."})
                 submission.update(status="failed", log="Stata was not run because dependency resolution failed.")
                 return
             submission["dependency_releases"] = [{"name": dep["name"], "version": dep["version"], "sha256": dep["sha256"]} for dep in deps]
-            submission["checks"].append({"name": "Dependencies", "status": "passed", "detail": f"Resolved {len(deps)} archived dependencies."})
+            submission["checks"].append({"name": "Dependencies", "status": "passed", "detail": f"Resolved {len(deps)} approved dependencies for checks."})
             dependency_bundles = [(dep["metadata"], self.zip_for(self.get("submissions", dep["submission_id"]))) for dep in deps]
             with self.stata_lock:
                 result = self.runner(self.zip_for(submission), submission["metadata"], dependency_bundles,
@@ -271,7 +352,14 @@ class Registry:
         except Exception as error:
             submission.update(status="unavailable", log=f"Checks could not complete: {type(error).__name__}: {error}")
         finally:
-            self.save("submissions", submission)
+            with self.lock:
+                latest = self.get("submissions", identifier)
+                for key in ("status", "checks", "log", "stata_version", "dependency_releases"):
+                    if key in submission:
+                        latest[key] = submission[key]
+                latest["checked_fingerprint"] = submission["fingerprint"]
+                latest["checked_at"] = now()
+                self.save("submissions", latest)
             self.event("checks", f"Checks {submission['status']}: {submission['name']}@{submission['version']}.")
 
     def review(self, identifier, body):
@@ -280,12 +368,16 @@ class Registry:
             decision, note = body.get("decision"), str(body.get("note", "")).strip()
             if len(note) > 8000:
                 raise APIError("Review note is too long.")
+            reviewer = body.get("reviewer", "")
+            if not isinstance(reviewer, str) or not reviewer.strip() or len(reviewer) > 100:
+                raise APIError("Provide the reviewer's name for the decision record.")
+            reviewer = reviewer.strip()
             if decision == "request_changes":
                 if not note:
                     raise APIError("Explain the changes needed.")
                 if submission["status"] not in ("passed", "failed", "unavailable"):
                     raise APIError("This submission cannot be returned for changes.", 409)
-                submission.update(status="changes_requested", review_note=note)
+                submission.update(status="changes_requested", review_note=note, reviewer=reviewer, reviewed_at=now())
                 self.save("submissions", submission)
                 self.event("review", f"Changes requested for {submission['name']}@{submission['version']}: {note}")
                 return submission
@@ -293,107 +385,26 @@ class Registry:
                 raise APIError("Choose approve or request_changes.")
             if submission["status"] != "passed":
                 raise APIError("Only the exact revision with passing checks can be approved.", 409)
+            if submission.get("superseded_by"):
+                raise APIError("A newer revision exists. Review that revision instead.", 409)
+            confirmation = submission.get("confirmation", {})
+            owner = self.owner_for(submission["name"])
+            if confirmation.get("status") != "verified" or confirmation.get("fingerprint") != submission["fingerprint"]:
+                raise APIError("Confirm the maintainer for this exact submission before approval.", 409)
+            if owner and owner["email"].casefold() != confirmation.get("email", "").casefold():
+                raise APIError("The recorded maintainer changed. Submit a new revision for confirmation.", 409)
+            expected = hashlib.sha256((submission["sha256"] + encoded(submission["metadata"])).encode()).hexdigest()
+            if expected != submission["fingerprint"] or submission.get("checked_fingerprint") != expected:
+                raise APIError("The candidate differs from its checked revision. Submit and check a new revision.", 409)
             self.zip_for(submission)
             for dep in submission["dependency_releases"]:
                 current = self.release(dep["name"], dep["version"])
                 if current["sha256"] != dep["sha256"]:
-                    raise APIError("An archived dependency changed after checking.", 409)
+                    raise APIError("A checked dependency changed. Submit a new revision.", 409)
                 self.zip_for(self.get("submissions", current["submission_id"]))
-            release = {key: submission[key] for key in ("name", "version", "metadata", "sha256", "files", "dependency_releases")}
-            release.update(id=uuid.uuid4().hex, submission_id=identifier, created_at=now())
-            submission.update(status="approved", review_note=note)
-            try:
-                with self.connect() as db:
-                    db.execute("INSERT INTO releases(id,name,version,value) VALUES(?,?,?,?)", (release["id"], release["name"], release["version"], encoded(release)))
-                    db.execute("UPDATE submissions SET value=? WHERE id=?", (encoded(submission), identifier))
-                    self.event("release", f"Approved and archived {release['name']}@{release['version']}.", db)
-            except sqlite3.IntegrityError:
-                raise APIError("This version is already published.", 409) from None
-            return submission
-
-    def snapshot(self):
-        with self.lock:
-            latest = {}
-            for release in sorted(self.rows("releases"), key=version_key):
-                latest[release["name"]] = {k: release[k] for k in ("name", "version", "sha256")}
-            snapshot = {"id": uuid.uuid4().hex, "created_at": now(), "packages": sorted(latest.values(), key=lambda p: p["name"])}
-            self.save("snapshots", snapshot)
-            self.event("snapshot", f"Captured the local catalog ({len(latest)} packages).")
-            return snapshot
-
-    def daily_snapshot(self):
-        # Capture once per UTC day while the local service is running; never invent past captures.
-        snapshots = self.rows("snapshots")
-        if not snapshots or snapshots[0]["created_at"][:10] != now()[:10]:
-            self.snapshot()
-
-    def restore(self, name, version, body):
-        if body.get("trusted") is not True:
-            raise APIError("Confirm that you trust this package before installing and running it.")
-        release = self.release(name, version)
-        submission = self.get("submissions", release["submission_id"])
-        deps = self.dependencies(release["metadata"])
-        dependency_bundles = [(dep["metadata"], self.zip_for(self.get("submissions", dep["submission_id"]))) for dep in deps]
-        directory = self.data / "environment" / "jobs" / uuid.uuid4().hex
-        with self.stata_lock:
-            result = self.runner(self.zip_for(submission), release["metadata"], dependency_bundles, directory, self.stata_path)
-        if result["status"] == "passed":
-            environment = {"name": name, "version": version, "sha256": release["sha256"], "installed_at": now(), "library_path": result.get("library_path", str(directory / "plus"))}
-            self.set_setting("environment", environment)
-            self.event("restore", f"Installed and smoke-tested {name}@{version} in the managed local library.")
-        else:
-            environment = self.setting("environment")
-        return {**result, "environment": environment}
-
-    def diff(self, name, version):
-        release = self.release(name, version)
-        history = sorted((r for r in self.rows("releases") if r["name"] == name), key=version_key)
-        position = next(i for i, r in enumerate(history) if r["id"] == release["id"])
-        previous = history[position - 1] if position else None
-        current_files = bundle_files(self.zip_for(self.get("submissions", release["submission_id"])))
-        previous_files = bundle_files(self.zip_for(self.get("submissions", previous["submission_id"]))) if previous else {}
-        changed = []
-        for path in sorted(current_files.keys() & previous_files.keys()):
-            if current_files[path] != previous_files[path]:
-                before, after = previous_files[path], current_files[path]
-                if len(before) + len(after) > 500_000 or b"\0" in before + after:
-                    diff = "Binary or large file changed; download both releases to inspect."
-                else:
-                    diff = "".join(difflib.unified_diff(before.decode("utf-8", "replace").splitlines(True), after.decode("utf-8", "replace").splitlines(True), fromfile=f"{previous['version']}/{path}", tofile=f"{version}/{path}"))[:100_000]
-                changed.append({"path": path, "diff": diff})
-        return {"previous_version": previous["version"] if previous else None, "added": sorted(current_files.keys() - previous_files.keys()), "removed": sorted(previous_files.keys() - current_files.keys()), "changed": changed}
-
-    def transfer(self, body):
-        name = body.get("name")
-        releases = [r for r in self.rows("releases") if r["name"] == name]
-        if not releases:
-            raise APIError("Publish a package before recording a maintainer transfer.")
-        for key in ("to_maintainer", "to_email", "evidence"):
-            if not isinstance(body.get(key), str) or not body[key].strip() or len(body[key]) > 8000:
-                raise APIError(f"Provide {key}.")
-        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", body["to_email"]):
-            raise APIError("Provide a valid contact email.")
-        owner = self.setting(f"owner:{name}") or {"maintainer": releases[0]["metadata"]["maintainer"]}
-        transfer = {"id": uuid.uuid4().hex, "name": name, "from_maintainer": owner["maintainer"], "to_maintainer": body["to_maintainer"].strip(), "to_email": body["to_email"].strip(), "evidence": body["evidence"].strip(), "status": "pending", "created_at": now()}
-        self.save("transfers", transfer)
-        self.event("transfer", f"Recorded a transfer request for {name}; operator review required.")
-        return transfer
-
-    def approve_transfer(self, identifier):
-        with self.lock:
-            transfer = self.get("transfers", identifier)
-            if transfer["status"] != "pending":
-                raise APIError("This transfer has already been reviewed.", 409)
-            releases = [r for r in self.rows("releases") if r["name"] == transfer["name"]]
-            owner = self.setting(f"owner:{transfer['name']}") or {"maintainer": releases[0]["metadata"]["maintainer"]}
-            if owner["maintainer"] != transfer["from_maintainer"]:
-                raise APIError("The maintainer changed since this request was recorded. Record a new request.", 409)
-            transfer.update(status="approved", approved_at=now())
-            with self.connect() as db:
-                db.execute("UPDATE transfers SET value=? WHERE id=?", (encoded(transfer), identifier))
-                db.execute("INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)", (f"owner:{transfer['name']}", encoded({"maintainer": transfer["to_maintainer"], "email": transfer["to_email"]})))
-                self.event("transfer", f"Operator approved {transfer['name']} maintainer transfer to {transfer['to_maintainer']}.", db)
-            return transfer
+            submission["reviewer"] = reviewer
+            result = self.approve_candidate(submission, note)
+            return result
 
     def close(self):
         self.executor.shutdown(wait=True)
@@ -437,28 +448,41 @@ class Handler(BaseHTTPRequestHandler):
             path = unquote(urlsplit(self.path).path)
             if path == "/api/state":
                 return self.send(self.registry.state(base))
+            if path == "/api/archive":
+                return self.send(self.registry.archive_state(base))
+            if path == "/api/handoff":
+                return self.send(self.registry.handoff_state())
+            if path == "/api/demo-mailbox":
+                return self.send(self.registry.demo_mailbox())
+            match = re.fullmatch(r"/api/archive/([a-z][a-z0-9_]{0,31})/download", path)
+            if match:
+                return self.send(self.registry.archive_download(match[1]), content_type="application/zip", download=f"{match[1]}-current.zip")
+            if path.startswith("/archive/"):
+                relative = path[len("/archive/"):]
+                if re.fullmatch(r"[a-z]/", relative):
+                    relative += "stata.toc"
+                return self.send(self.registry.archive_file(relative), content_type="application/octet-stream")
             if path == "/api/examples":
                 return self.send({"examples": self.registry.state(base)["examples"]})
             match = re.fullmatch(r"/api/submissions/([a-f0-9]{32})/download", path)
             if match:
                 submission = self.registry.get("submissions", match[1])
                 return self.send(self.registry.zip_for(submission), content_type="application/zip", download=f"{submission['name']}-{submission['version']}.zip")
-            match = re.fullmatch(r"/api/releases/([^/]+)/([^/]+)/(download|diff)", path)
+            match = re.fullmatch(r"/api/submissions/([a-f0-9]{32})/(comparison|reproduce|handoff|receipt|plan)", path)
             if match:
-                release = self.registry.release(match[1], match[2])
-                if match[3] == "diff":
-                    return self.send(self.registry.diff(match[1], match[2]))
-                return self.send(self.registry.zip_for(self.registry.get("submissions", release["submission_id"])), content_type="application/zip", download=f"{release['name']}-{release['version']}.zip")
-            match = re.fullmatch(r"/packages/([^/]+)/([^/]+)/(.*)", path)
-            if match:
-                release = self.registry.release(match[1], match[2])
-                filename = match[3] or "stata.toc"
-                if filename == "stata.toc":
-                    return self.send(f"v 3\nd SSC-NG local approved archive\np {release['name']} {release['name']} {release['version']}\n".encode(), content_type="text/plain; charset=utf-8")
-                files = bundle_files(self.registry.zip_for(self.registry.get("submissions", release["submission_id"])))
-                if filename not in files:
-                    raise APIError("Package file not found.", 404)
-                return self.send(files[filename], content_type="text/plain; charset=utf-8")
+                identifier, action = match[1], match[2]
+                submission = self.registry.get("submissions", identifier)
+                if action == "comparison":
+                    return self.send(self.registry.comparison(identifier))
+                if action == "plan":
+                    return self.send(self.registry.handoff_plan(identifier))
+                if action == "receipt":
+                    receipt = submission.get("delivery", {}).get("receipt")
+                    if not receipt:
+                        raise APIError("A delivery receipt is available after successful delivery.", 409)
+                    return self.send(receipt, download=f"{submission['name']}-delivery-receipt.json")
+                content = self.registry.handoff_bundle(identifier) if action == "handoff" else check_reproduction(self.registry.zip_for(submission), submission["metadata"])
+                return self.send(content, content_type="application/zip", download=f"{submission['name']}-{action}.zip")
             static = {"/": ("index.html", "text/html"), "/index.html": ("index.html", "text/html"), "/assets/app.js": ("assets/app.js", "text/javascript"), "/assets/styles.css": ("assets/styles.css", "text/css")}
             if path in static:
                 filename, mime = static[path]
@@ -492,6 +516,14 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(body, dict):
                 raise APIError("Request must be an object.")
             path = unquote(urlsplit(self.path).path)
+            if path == "/api/intake/inspect":
+                try:
+                    source = base64.b64decode(body.get("zip_base64", ""), validate=True)
+                except (ValueError, TypeError, binascii.Error):
+                    raise APIError("Select a valid package ZIP to read its metadata.") from None
+                if len(source) > 10 * 1024 * 1024:
+                    raise APIError("Package ZIP exceeds the 10 MB limit.", 413)
+                return self.send(inspect_upload(source))
             if path == "/api/submissions":
                 return self.send({"submission": self.registry.submit(body)}, 201)
             match = re.fullmatch(r"/api/examples/([a-z0-9.-]+)/submit", path)
@@ -503,16 +535,15 @@ class Handler(BaseHTTPRequestHandler):
             match = re.fullmatch(r"/api/submissions/([a-f0-9]{32})/review", path)
             if match:
                 return self.send({"submission": self.registry.review(match[1], body)})
-            match = re.fullmatch(r"/api/releases/([^/]+)/([^/]+)/restore", path)
+            match = re.fullmatch(r"/api/submissions/([a-f0-9]{32})/(confirm|confirmation|deliver)", path)
             if match:
-                return self.send(self.registry.restore(match[1], match[2], body))
-            if path == "/api/snapshots":
-                return self.send({"snapshot": self.registry.snapshot()}, 201)
-            if path == "/api/transfers":
-                return self.send({"transfer": self.registry.transfer(body)}, 201)
-            match = re.fullmatch(r"/api/transfers/([a-f0-9]{32})/approve", path)
-            if match:
-                return self.send({"transfer": self.registry.approve_transfer(match[1])})
+                if match[2] == "confirm":
+                    submission = self.registry.confirm(match[1], body)
+                elif match[2] == "confirmation":
+                    submission = self.registry.request_confirmation(match[1])
+                else:
+                    submission = self.registry.deliver(match[1], body)
+                return self.send({"submission": submission})
             raise APIError("Not found.", 404)
         except APIError as error:
             self.send({"error": str(error)}, error.status)
@@ -535,22 +566,13 @@ def main():
     args = parser.parse_args()
     registry = Registry(args.data_dir, args.stata)
     server = make_server(registry, args.port)
-    stop = threading.Event()
-
-    def captures():
-        while not stop.is_set():
-            registry.daily_snapshot()
-            stop.wait(60)
-
-    threading.Thread(target=captures, daemon=True).start()
-    print(f"SSC-NG local pilot: http://127.0.0.1:{server.server_port}", flush=True)
-    print(f"Data: {registry.data}\nStata: {registry.stata_path or 'unavailable'}", flush=True)
+    print(f"SSC-NG submission demo: http://127.0.0.1:{server.server_port}", flush=True)
+    print(f"Data: {registry.data}\nToday's local archive: {registry.current_archive}\nStata: {registry.stata_path or 'unavailable'}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
-        stop.set()
         server.server_close()
         registry.close()
 

@@ -1,3 +1,0 @@
-v 3
-d SSC-NG standalone smoke package 1.0.0
-p sscng_smoke Returns twice the supplied value; no external dependencies.

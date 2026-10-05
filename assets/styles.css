@@ -15,7 +15,6 @@ body { margin: 0; padding: 24px; background: light-dark(#eef1f5, #11151d); }
     #sscng-meeting .sg-primary:hover:not(:disabled){background:var(--sg-brand);color:var(--sg-surface)}
     #sscng-meeting button:focus-visible,#sscng-meeting input:focus-visible,#sscng-meeting select:focus-visible,#sscng-meeting textarea:focus-visible{outline:2px solid var(--sg-brand);outline-offset:3px}
     #sscng-meeting input,#sscng-meeting select,#sscng-meeting textarea{width:100%;border:1px solid var(--sg-line);border-radius:6px;background:var(--sg-surface);padding:9px 10px;min-width:0}
-    #sscng-meeting input[readonly]{background:var(--sg-bg);color:var(--sg-muted)}
     #sscng-meeting textarea{min-height:68px;resize:vertical}
     #sscng-meeting label{display:block;font-weight:500}
     #sscng-meeting label input,#sscng-meeting label select,#sscng-meeting label textarea{margin-top:5px;font-weight:400}
@@ -27,9 +26,6 @@ body { margin: 0; padding: 24px; background: light-dark(#eef1f5, #11151d); }
     #sscng-meeting .sg-brand span{color:var(--sg-brand)}
     #sscng-meeting .sg-kicker{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--sg-muted);margin-bottom:7px;font-weight:500}
     #sscng-meeting .sg-small{font-size:12px;color:var(--sg-muted)}
-    #sscng-meeting .sg-scenario{display:flex;gap:10px;align-items:center;min-width:0}
-    #sscng-meeting .sg-scenario label{font-size:12px;color:var(--sg-muted)}
-    #sscng-meeting .sg-scenario select{width:210px;padding:7px 10px}
     #sscng-meeting .sg-tabs{display:flex;gap:3px;padding:0 26px;border-bottom:1px solid var(--sg-line);background:var(--sg-surface);flex-wrap:wrap}
     #sscng-meeting .sg-tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;padding:13px 15px;background:transparent;color:var(--sg-muted)}
     #sscng-meeting .sg-tabs button[aria-selected="true"]{border-bottom-color:var(--sg-brand);color:var(--sg-brand)}
@@ -53,10 +49,6 @@ body { margin: 0; padding: 24px; background: light-dark(#eef1f5, #11151d); }
     #sscng-meeting .sg-file{font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere}
     #sscng-meeting .sg-note{padding:11px 13px;border-radius:6px;background:var(--sg-bg);color:var(--sg-muted);font-size:12px;margin-top:15px}
     #sscng-meeting .sg-error{color:var(--sg-bad);background:var(--sg-bad-bg);padding:10px 12px;border-radius:6px;margin-top:14px}
-    #sscng-meeting .sg-steps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px}
-    #sscng-meeting .sg-step{background:var(--sg-surface);padding:7px 12px;border-radius:5px;color:var(--sg-muted);font-size:12px}
-    #sscng-meeting .sg-step.done{color:var(--sg-good);background:var(--sg-good-bg)}
-    #sscng-meeting .sg-step.current{color:var(--sg-brand);background:var(--sg-active);font-weight:500}
     #sscng-meeting .sg-check{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:12px 0;border-bottom:1px solid var(--sg-line)}
     #sscng-meeting .sg-check:last-child{border-bottom:0}
     #sscng-meeting .sg-check .sg-small{margin-top:3px}
@@ -68,26 +60,14 @@ body { margin: 0; padding: 24px; background: light-dark(#eef1f5, #11151d); }
     #sscng-meeting details{margin-top:14px}
     #sscng-meeting summary{font-weight:500;color:var(--sg-brand)}
     #sscng-meeting pre{font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--sg-bg);padding:13px;border-radius:6px;margin:10px 0 0;color:var(--sg-ink)}
-    #sscng-meeting .sg-release-grid{display:grid;grid-template-columns:225px minmax(0,1fr);gap:18px}
-    #sscng-meeting .sg-timeline{display:flex;flex-direction:column;gap:9px}
-    #sscng-meeting .sg-release{width:100%;text-align:left;padding:14px;display:block}
-    #sscng-meeting .sg-release[aria-pressed="true"]{background:var(--sg-active);border-color:var(--sg-brand)}
-    #sscng-meeting .sg-release .sg-small{display:block;margin-top:6px}
-    #sscng-meeting .sg-release-title{display:flex;justify-content:space-between;gap:8px;align-items:center}
     #sscng-meeting .sg-table{width:100%;border-collapse:collapse;font-size:12px}
     #sscng-meeting .sg-table th{font-weight:500;color:var(--sg-muted);text-align:left;padding:9px 6px;border-bottom:1px solid var(--sg-line)}
     #sscng-meeting .sg-table td{padding:10px 6px;border-bottom:1px solid var(--sg-line);overflow-wrap:anywhere}
-    #sscng-meeting .sg-diff{margin-top:16px}
-    #sscng-meeting .sg-diff-line{font:12px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;padding:3px 10px;white-space:pre-wrap;overflow-wrap:anywhere}
-    #sscng-meeting .sg-add{background:var(--sg-good-bg);color:var(--sg-good)}
-    #sscng-meeting .sg-remove{background:var(--sg-bad-bg);color:var(--sg-bad)}
     #sscng-meeting .sg-footer{padding:13px 26px;border-top:1px solid var(--sg-line);color:var(--sg-muted);font-size:12px;background:var(--sg-surface);display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap}
-    #sscng-meeting .sg-audit{margin-top:15px;padding-top:12px;border-top:1px solid var(--sg-line)}
-    #sscng-meeting .sg-audit div{padding:4px 0;font-size:12px;color:var(--sg-muted)}
     #sscng-meeting .sg-caption{margin-top:10px;font-size:12px;color:var(--sg-muted)}
     #sscng-meeting .sg-toast{margin-top:15px;padding:12px 14px;border-radius:6px;color:var(--sg-good);background:var(--sg-good-bg)}
-    @media(max-width:720px){#sscng-meeting .sg-grid,#sscng-meeting .sg-release-grid{grid-template-columns:1fr}#sscng-meeting .sg-timeline{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#sscng-meeting .sg-top{align-items:flex-start;flex-wrap:wrap}#sscng-meeting .sg-content{padding:20px}#sscng-meeting .sg-top,#sscng-meeting .sg-footer{padding:17px 20px}#sscng-meeting .sg-tabs{padding:0 10px}#sscng-meeting .sg-tabs button{padding:12px 9px}}
-    @media(max-width:420px){#sscng-meeting .sg-fields,#sscng-meeting .sg-timeline{grid-template-columns:1fr}#sscng-meeting .sg-intro{flex-wrap:wrap}#sscng-meeting .sg-content{padding:16px 12px}#sscng-meeting .sg-panel{padding:16px}#sscng-meeting .sg-scenario{width:100%}#sscng-meeting .sg-scenario select{width:auto;flex:1}#sscng-meeting .sg-tabs button{font-size:12px;padding:12px 8px}#sscng-meeting input,#sscng-meeting select,#sscng-meeting textarea{font-size:16px}}
+    @media(max-width:720px){#sscng-meeting .sg-grid{grid-template-columns:1fr}#sscng-meeting .sg-top{align-items:flex-start;flex-wrap:wrap}#sscng-meeting .sg-content{padding:20px}#sscng-meeting .sg-top,#sscng-meeting .sg-footer{padding:17px 20px}#sscng-meeting .sg-tabs{padding:0 10px}#sscng-meeting .sg-tabs button{padding:12px 9px}}
+    @media(max-width:420px){#sscng-meeting .sg-fields{grid-template-columns:1fr}#sscng-meeting .sg-intro{flex-wrap:wrap}#sscng-meeting .sg-content{padding:16px 12px}#sscng-meeting .sg-panel{padding:16px}#sscng-meeting .sg-tabs button{font-size:12px;padding:12px 8px}#sscng-meeting input,#sscng-meeting select,#sscng-meeting textarea{font-size:16px}}
     @media(pointer:coarse){#sscng-meeting button,#sscng-meeting select{min-height:44px}}
 
 /* Local service workspaces. */
@@ -110,16 +90,42 @@ body { margin: 0; padding: 24px; background: light-dark(#eef1f5, #11151d); }
 #sscng-meeting .sg-link-button{display:inline-block;border:1px solid var(--sg-line);border-radius:7px;padding:9px 14px;text-decoration:none;font-weight:500;text-align:center}
 #sscng-meeting .sg-link-button:hover{background:var(--sg-active)}
 #sscng-meeting .sg-link-button:focus-visible{outline:2px solid var(--sg-brand);outline-offset:3px}
-#sscng-meeting .sg-restore{margin-top:24px;padding-top:20px;border-top:1px solid var(--sg-line)}
 #sscng-meeting .sg-table-wrap{overflow:auto;max-width:100%;margin-top:15px}
 #sscng-meeting .sg-table th:nth-child(2),#sscng-meeting .sg-table td:nth-child(2){white-space:nowrap}
-#sscng-meeting .sg-transfer-record{padding:15px 0;border-bottom:1px solid var(--sg-line)}
-#sscng-meeting .sg-transfer-record:last-child{border-bottom:0}
-#sscng-meeting .sg-events{list-style:none;margin:0;padding:0}
-#sscng-meeting .sg-events li{padding:12px 0;border-bottom:1px solid var(--sg-line);overflow-wrap:anywhere}
-#sscng-meeting .sg-events li:last-child{border-bottom:0}
 #sscng-meeting .sg-evidence{overflow-wrap:anywhere}
-#sscng-meeting .sg-release strong{overflow-wrap:anywhere}
 #sscng-meeting .sg-note p{margin:6px 0}
 #sscng-meeting .sg-top .sg-small{margin-top:2px}
-@media(max-width:720px){#sscng-meeting .sg-service{align-items:flex-start}#sscng-meeting .sg-steps{display:none}}
+@media(max-width:720px){#sscng-meeting .sg-service{align-items:flex-start}}
+
+/* The current archive is the final step of the submission workflow. */
+#sscng-meeting .sg-archive-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+#sscng-meeting .sg-handoff{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+#sscng-meeting .sg-handoff h3{margin-bottom:8px}
+#sscng-meeting .sg-handoff details code{display:block;margin-top:8px}
+#sscng-meeting .sg-handoff>div{min-width:0}
+#sscng-meeting .sg-archive-grid h3{margin:0;overflow-wrap:anywhere}
+#sscng-meeting .sg-archive-grid .sg-actions{align-items:stretch}
+@media(max-width:720px){#sscng-meeting .sg-archive-grid{grid-template-columns:1fr}}
+@media(max-width:420px){#sscng-meeting .sg-handoff{flex-wrap:wrap}}
+
+/* Author intake and accountable handoff. */
+#sscng-meeting .sg-upload{padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid var(--sg-line)}
+#sscng-meeting .sg-upload .sg-caption{margin-top:9px}
+#sscng-meeting .sg-fields .sg-caption{font-weight:400;margin-bottom:0}
+#sscng-meeting .sg-fields .sg-note{margin-top:0}
+#sscng-meeting .sg-section-head{display:flex;gap:12px;justify-content:space-between;align-items:center;margin:28px 0 12px}
+#sscng-meeting .sg-section-head h3{margin:0}
+#sscng-meeting .sg-remedy{margin:8px 0 0;font-size:12px;color:var(--sg-ink)}
+#sscng-meeting .sg-confirm-fields .sg-actions{margin-top:12px}
+#sscng-meeting .sg-mail{margin-top:14px;padding:12px;background:var(--sg-bg);border:1px solid var(--sg-line);border-radius:6px;overflow-wrap:anywhere}
+#sscng-meeting .sg-mail .sg-code{font-size:18px;letter-spacing:2px;white-space:nowrap}
+#sscng-meeting .sg-mail p{margin-top:8px}
+#sscng-meeting h4{font-size:12px;font-weight:600;margin:20px 0 5px}
+#sscng-meeting .sg-attempts li{display:block}
+#sscng-meeting .sg-stack .sg-panel>h3{margin-bottom:8px}
+#sscng-meeting .sg-panel>label.sg-spaced{margin-top:14px}
+#sscng-meeting .sg-check .sg-caption{margin-top:4px}
+@media(max-width:420px){#sscng-meeting .sg-section-head{align-items:flex-start;flex-direction:column;gap:4px}#sscng-meeting .sg-actions>*{max-width:100%}}
+
+#sscng-meeting .sg-comparison-table { table-layout: fixed; }
+#sscng-meeting .sg-comparison-table th:nth-child(2),#sscng-meeting .sg-comparison-table td:nth-child(2) { white-space: normal; }

@@ -1,0 +1,12 @@
+{
+  "name": "sscng_trial",
+  "version": "1.0.0",
+  "title": "SSC-NG submission trial package",
+  "maintainer": "SSC-NG trial-package contributors",
+  "email": "trial@example.invalid",
+  "stata": "16.0",
+  "license": "MIT",
+  "dependencies": [],
+  "notes": "Initial trial release. sscng_trial, value(2) returns 4. Includes arithmetic and version assertions. No dependencies. Use the local demo mailbox to confirm this illustrative contact.",
+  "test_file": "sscng_trial_test.do"
+}

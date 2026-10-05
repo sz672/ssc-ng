@@ -1,0 +1,3 @@
+v 3
+d SSC-NG standalone trial package 1.0.0
+p sscng_trial Returns twice the supplied value; no external dependencies.

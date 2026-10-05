@@ -1,245 +1,198 @@
-# SSC-NG architecture — local baseline 0.1.0
+# SSC-NG submission architecture — local baseline 0.1.0
 
-Updated 2026-09-28. This is the design reference; use [README.md](../README.md)
-for running the demo, uploading the smoke packages, and the version history.
-“Current” below describes implemented behavior; “proposed” describes future work.
+Updated 2026-10-05. Use [README.md](../README.md) to run the demo and exercise a
+submission followed by an update.
 
-## 1. Place within the published project
+## Scope and archive handoff
 
-The [SSC-NG homepage](https://ssc-ng.net/) describes modernization of the Stata
-archive and currently directs submissions to the legacy service. Our localhost
-pilot is a separate development demonstration.
+The submission system receives proposed Stata packages, checks their exact files,
+records maintainer confirmation and human review, and delivers approved files to
+**today’s current archive**. Approval and delivery have distinct states. There is
+one current output per package; a successfully delivered update replaces it.
 
-The [development plan](https://ssc-ng.net/development-plan/) places the relevant
-architecture in Task 2: email and web intake, a central GitHub catalog reviewed
-through pull requests, compatible installation, independent package copies,
-and recoverable archives. Task 4 extends submission automation, version metadata,
-dependencies, documentation, and citation. This small pilot explores those
-technical foundations; it does not complete a project task or replace governance.
-
-The working design is **one registry change request per proposed package
-release**. A pull request proposes a catalog change; it is not a package download.
-Authors can keep their development files wherever they choose. A web or email
-intake adapter can create the registry request on their behalf. This follows the
-central-catalog direction while allowing a future review host other than GitHub.
-
-Moderation records whether a submission is appropriate and meets the agreed
-requirements. Passing a smoke test does not establish scientific correctness.
-
-## 2. Separate four kinds of records
-
-| Record | Example | Purpose |
-| --- | --- | --- |
-| Application history | SSC-NG local baseline `0.1.0` | Changes to this website, server, and documentation |
-| Author's development history | Repository URL, full commit ID, package subdirectory | Original reference and provenance; available only when supplied |
-| Package release | `sscng_smoke@1.0.0` plus the ZIP SHA-256 | Exact installable content preserved by SSC-NG |
-| Submission/review history | Request ID, revision, metadata, checks, decision | Why particular bytes became an accepted release |
-
-A Git tag, a package version, and a storage checksum answer different questions.
-A tag is a human label that can move. A full Git commit identifies a repository
-snapshot. A SHA-256 identifies specific bytes. The registry must also keep those
-bytes: a checksum alone cannot recover a deleted file.
-
-Existing systems illustrate the separation:
-
-| System | Useful lesson |
-| --- | --- |
-| [CRAN](https://cran.r-project.org/src/contrib/Archive/digest/) | Distribute package archives and keep earlier release archives. |
-| [Bioconductor](https://contributions.bioconductor.org/git-version-control.html) | Maintain project-controlled Git history independently of an optional GitHub remote. |
-| [Homebrew](https://docs.brew.sh/Formula-Cookbook) | Keep a small installation recipe identifying source URLs and checksums; development source and distribution artifacts serve different roles. |
-
-## 3. What the local pilot actually stores
-
-The default data root is `.sscng/` under the project. `--data-dir` can select a
-different root. `.sscng/` and its descendants are excluded from Git; another
-custom location needs its own exclusion if it is inside a source repository.
-
-| Path relative to data root | Contents |
-| --- | --- |
-| `registry.sqlite3` | Package metadata, submission IDs, hashes, checks/logs, approvals, releases, and catalog captures |
-| `submissions/<id>/source.zip` | Original uploaded ZIP, saved before Stata checks; retained even when checks fail |
-| `jobs/<id>/` | Extracted files, runner output, and temporary installation libraries for checks |
-| `environment/jobs/<id>/` | Installations and output from restoring archived releases |
-| `examples/` | Rebuildable ZIPs for the older built-in dependency demonstration |
-
-Approval creates a release record pointing to the existing submission ZIP; it
-does not make another release ZIP. Downloads and Stata installation read that
-saved archive and verify its checksum. An accepted name/version cannot be
-overwritten. Version `1.1.0` therefore leaves `1.0.0` available.
-
-Current limitations: repeated submissions can store identical ZIPs more than
-once; job directories also duplicate extracted files. There is no cross-submission
-deduplication, structured upstream URL/commit capture, remote-source importer,
-real hosted PR integration, or independently verified backup. The local operator
-approves candidates; authentication and multi-user permissions are not implemented.
-
-## 4. Proposed neutral submission and preservation workflow
+Archive preservation and versioned history already have an established process
+in [ssc-ng/archive](https://github.com/ssc-ng/archive/). That process is the
+downstream owner of historical snapshots and retrieval. The
+submission demo therefore does not need its own archive storage redesign,
+scheduled catalog snapshots, or historical installation interface.
 
 ```mermaid
 flowchart LR
-    A[Git repository / Dropbox / website / upload / email] --> B[Common intake]
-    B --> C[Freeze files in SSC-NG storage]
-    C --> D[Registry change request]
-    D --> E[Check exact saved revision]
-    E --> F[Moderator decision]
-    F --> G[Publish versioned catalog and Stata files]
-    C --> H[Independent preservation copy]
-    G --> H
+    A[ZIP inspection and metadata] --> B[Saved candidate]
+    B --> C[Stata checks and maintainer confirmation]
+    C --> D[Compare and review]
+    D -->|Changes requested| A
+    D --> E[Approved / delivery pending]
+    E --> F[Deliver to local current archive]
+    F -->|Failure / retry| E
+    F --> G[Delivery receipt and current package]
+    G -. Production input still to agree .-> H[Existing archive process]
 ```
 
-1. **Receive and record provenance.** Assign a provider-independent submission ID.
-   Record the original project/directory link, source kind, package subdirectory,
-   author-supplied version, and the person making the submission.
-2. **Capture once.** Fetch or accept the full package, validate it, compute its
-   hashes, and store an immutable candidate before scheduling checks. A source
-   fetch is incomplete until all required package files are captured. Mirror the
-   captured object and metadata to an independent destination; record whether
-   backup is pending or verified rather than treating a local copy as a backup.
-3. **Open a registry request.** Point the proposed catalog entry at this captured
-   object. Form/email submitters need no account at the author's hosting provider.
-   In the first implementation, a service account can create a central catalog
-   PR; the provider's PR number is a reference, not the internal identity.
-4. **Check and review that revision.** Pin metadata, bundle hash, dependency hashes,
-   check environment, and request revision together. A changed candidate creates
-   a new revision and invalidates the previous approval. Checks run on request
-   creation/update, not continuously over all upstream repositories.
-5. **Publish exactly what passed.** Approval points a new immutable package
-   version at the checked bytes; it never downloads “latest” again. Package pages
-   show both the original source link and an SSC-NG archived download/install URL.
-   Normal publication should require verified independent preservation first.
+The implemented destination is local. The demo does not update the live SSC
+archive, create a hosted pull request, or commit/push to `ssc-ng/archive`.
 
-| Author's platform | Intake rule | Evidence retained |
-| --- | --- | --- |
-| GitHub, GitLab, Bitbucket, or another Git server | Resolve requested revision to a full commit; capture selected package files | Repository/directory link, subdirectory, requested tag/branch, full commit, bundle hash; capture required LFS/submodule files explicitly |
-| Dropbox or another shared folder | Prefer one uploaded ZIP or downloadable ZIP snapshot | Original share/directory link, retrieval time, file manifest, package version, bundle hash; provider revision ID if available |
-| Ordinary website | Download a declared package archive and validate contents | Project/directory link, download URL, retrieval time, bundle hash |
-| Local upload or email | Accept an attachment through the same intake service | Submitter, received time, optional original directory link, attachment hash; mark origin as unavailable if none is supplied |
+## Five submission priorities
 
-A provider adapter translates its links, authentication, and event format into
-this common record. There is no promise that every arbitrary URL already works.
-Private sources require authorized access; temporary download credentials must
-not become public catalog links. For a changing folder, downloading files one
-at a time can mix two versions: require a coherent ZIP or verify a stable folder
-listing and file revisions, retrying if they change during capture.
+| Priority | Implemented behavior |
+| --- | --- |
+| Define the archive handoff | The destination view exposes the local layout and boundary. An approved handoff ZIP includes the exact installable files and a manifest with candidate identity, checksums, expected current package, and removals. The actual production input is still unknown. |
+| Straightforward, authorized submission | Bounded ZIP inspection imports supported `metadata.json` fields and explicit `.pkg` hints without execution. Authors review and edit the form. Updates use the recorded maintainer contact and need confirmation specific to the candidate. |
+| Useful Stata checks | Check metadata, safe paths, inventory completeness, explicit version consistency, dependencies, minimum runtime, installation, and the selected `.do` test. Failures carry remedies; a download supplies the candidate and a local reproduction recipe. |
+| Efficient review | Show differences from today's package, preserve earlier revision feedback, and record reviewer name, note, and decision. New revisions need fresh checks and confirmation. A candidate based on an outdated current package must be revised. |
+| Dependable delivery | Approved candidates have a separate pending delivery. Track attempts, errors, and receipts; restore prior files on failure; recover interrupted writes on restart; permit safe retries without approving again. |
 
-**Dropbox example:** capture version `1.0.0` from an author's shared directory and
-save object `H1`. Later the author replaces its files with `1.1.0`; a new request
-captures object `H2`, keeping the same reference link. After approval, both versions
-resolve through SSC-NG. Deleting the shared folder affects the reference link,
-but the captured versions remain installable. Changes that were overwritten
-before any submission cannot be reconstructed by SSC-NG.
+The author’s development repository can remain anywhere. ZIP submission is the
+implemented intake route; an optional project URL supplies context, not remote
+code execution or automatic repository import.
 
-Proposed manifest fields (a schema sketch, not the current upload API):
+### Workflow references and design choices
 
-```text
-package: name, version, title, maintainer, license, minimum_stata
-dependencies: [{name, version, sha256}]
-source: kind, directory_url, download_url, package_subdirectory,
-        requested_revision, resolved_commit_or_provider_revision, captured_at
-artifact: sha256, byte_count, files[{path, sha256, size}], storage_key
-review: request_id, revision_id, candidate_fingerprint,
-        checks[{environment, dependency_hashes, result, log_key}], decision
-preservation: replica_location, verified_at, backup_checkpoint
-```
+- [CRAN submission policy](https://cran.r-project.org/web/packages/policies.html#Submission)
+  provides the main author model: submit a package, confirm the maintainer,
+  address check results, and explain a resubmission. Here the transport is a
+  Stata ZIP and confirmation is demonstrated locally.
+- [Bioconductor’s current submitter guide](https://github.com/Bioconductor/BiocContributions/blob/devel/docs/submitters.md)
+  informs visible check states, human review, and revisions that retain feedback.
+  This demo adopts that review structure without requiring its GitHub and build
+  infrastructure or its domain-specific package policies.
+- [Homebrew’s contribution guide](https://docs.brew.sh/Adding-Software-to-Homebrew)
+  informs exact reviewed source, checksums, explicit dependencies, and a meaningful
+  installation test. Container registries and binary bottle distribution do not
+  determine the submission workflow implemented here.
 
-Only fields applicable to a provider are populated. A local path can be recorded
-privately as provenance, but it is not a public reference URL. Each later request
-compares its captured files against the previously approved manifest, not against
-the current contents of the author's mutable folder.
+Passing checks provides evidence for review; it does not establish scientific
+correctness. Package versions remain useful submission metadata even though the
+delivery destination contains only the current accepted package.
 
-## 5. Keep all versions without unnecessary copies
+### Candidate checks and confirmation
 
-Start with **one compressed ZIP per unique hash**, plus small metadata records:
+Each saved candidate has an exact ZIP checksum and a fingerprint binding that
+checksum to the submitted metadata. Approval requires the same fingerprint to
+have passing checks and verified demo confirmation. The service checks source
+integrity again at approval and delivery, along with the checked dependencies.
 
-```text
-objects/sha256/ab/abcdef...zip       # immutable package bytes
-catalog/sscng_smoke/1.0.0.json       # points to H1
-catalog/sscng_smoke/1.1.0.json       # points to H2
-requests/<id>/<revision>.json       # can reuse H1 or H2
-captures/<date>.json                # version/hash references, not copied ZIPs
-```
+Confirmation codes are single-use, expire after 30 minutes, and allow five failed
+attempts before a new code is needed. They appear in a **visible demo mailbox**;
+no email is sent. This tests the workflow and update-contact rules, not real
+email possession. Reviewer names are operator-entered audit details, not
+authenticated identities or enforced reviewer roles.
 
-Compute hashes on receipt; write a new object atomically only when absent, and
-verify an existing object before reusing it. Retries, approvals, and date-based
-catalog captures reference the same object. Updating the “latest” pointer does
-not alter an older version. Keep dependency objects pinned by accepted manifests.
+The demo requires `X.Y.Z` versions and exact dependency versions; these are local
+prototype rules, not assertions about official SSC requirements. A test defaults
+to `smoke.do`; optional `test_file` can identify another safe package-relative
+`.do` path. The inventory needs an ado command and help file. Dependency sources
+must match the currently delivered local records, and checks use a
+fresh Stata library. The
+reproduction kit contains the candidate, instructions, and a Stata do-file;
+dependency sources must be supplied separately at the reviewed versions.
 
-ZIP hashing deduplicates identical archives, **not** shared files inside different
-ZIPs. Different ZIP timestamps can also produce different archive hashes. Our
-smoke builder uses stable ZIP metadata so repeated builds of identical sources
-produce identical bytes. Retain exact author-uploaded bytes when preserving
-submission evidence; a normalized file-tree hash may additionally identify
-equivalent contents.
+The form requires explicit trust before code execution. Local library isolation
+is not an operating-system sandbox. Runtime validation currently covers Stata
+19.5; the fixtures declare Stata 16, which has not been verified in this work.
 
-For small Stata packages, whole compressed releases are a simple starting point.
-If measured storage growth warrants it, add file-level content addressing: each
-version's manifest maps filenames to hashes, and unchanged files are stored once.
-Serve reconstructed `.pkg`/`.ado` files from that manifest and cache install trees
-as needed. Keeping original ZIP evidence still consumes space; file deduplication
-does not remove that cost. Avoid a chain of patches as the only recovery method.
+## Local implementation
 
-Preserve accepted objects and anything referenced by review/retention records.
-Only reclaim unreferenced objects after a defined retention period and reference
-audit. Derived check libraries may be cleaned after necessary logs are preserved.
-Independent backup copies are intentional redundancy and must survive deduplication.
+The default data root is `.sscng/`; `--data-dir` selects another root. `.sscng/`
+is excluded from Git.
 
-## 6. A workable plan without GitHub
+`/api/state` reports an API revision separate from the application version. The
+page checks this before enabling write requests. An outdated running process
+shows a restart message instead of accepting an unsupported workflow; polling
+reconnects after restart without clearing the selected ZIP or form.
 
-**Recommendation:** keep Git for application/catalog history, use an
-institution-operated [Forgejo](https://forgejo.org/docs/latest/) service for
-repositories and PR review, and keep package objects in independent storage
-served over HTTPS. A managed GitLab service is another option; plain Git over SSH
-works for history but needs a separate review interface. Hosting and maintenance
-responsibility remain with SSC-NG or its institution.
+| Component | Responsibility |
+| --- | --- |
+| `index.html`, `assets/` | Submit, checks/review, and today’s archive views |
+| `pilot/intake.py` | Metadata import, inventory inspection, and reproduction downloads |
+| `pilot/packages.py` | ZIP and Stata package validation; Stata check execution |
+| `pilot/service.py` | Submission queue, approval gates, and HTTP endpoints |
+| `pilot/workflow.py` | Demo confirmation, recorded maintainers, and review comparisons |
+| `pilot/delivery.py` | Approval, handoff plans/bundles, delivery attempts, receipts, and recovery |
+| `pilot/archive.py` | Current file ownership, writes, and durable undo journals |
+| `registry.sqlite3` | Metadata, checks, confirmations, reviews, deliveries, and current package references |
+| `submissions/<id>/source.zip` | Exact candidate bytes, including unsuccessful submissions |
+| `jobs/<id>/` | Check workspaces and runner output |
+| `current-archive/<letter>/` | Current `.pkg` and inventory files, grouped by the package’s first letter |
+| `delivery-journals/` | Undo information for in-progress local delivery |
 
-| Component | With GitHub initially | Independent replacement |
-| --- | --- | --- |
-| Application and catalog history | Git repositories on GitHub | Git repositories on institution-operated Forgejo |
-| PR discussion, permissions, decisions | GitHub PRs/accounts | Forgejo PRs/accounts, with exported review records |
-| Package files | SSC-NG-owned artifact storage | Same storage; no dependency on GitHub download URLs |
-| Checks | PR-triggered worker | Independent worker consuming the same internal request |
-| Website and Stata endpoints | SSC-NG domain and web server | Same stable domain or documented mirror endpoint |
+For `sscng_trial`, the descriptor is
+`.sscng/current-archive/s/sscng_trial.pkg`. The HTTP installation base is
+`/archive/s/`; `/api/archive/sscng_trial/download` produces a ZIP of the current
+published files. The original submitted ZIP remains available from its review
+record. The current archive API selects the currently published submission, not
+an arbitrary historical package version.
 
-Git history can be transferred using [Git bundles](https://git-scm.com/docs/git-bundle).
-Bundles do not preserve uncommitted work, `.sscng/`, hosted PR discussions, or
-separate LFS objects. Export those separately. Local uncommitted work therefore
-needs a filesystem backup while commits are paused.
+The handoff manifest (`ssc-ng-reviewed-handoff-v1`) is the integration contract.
+It identifies the approved source/fingerprint, reviewed time, expected base,
+installable files and hashes, and added/changed/removed paths. The local adapter
+maintains the letter bucket’s `stata.toc`. A production adapter must apply these
+changes through the input agreed with the archive operators; publishing the
+GitHub mirror directly is not assumed to be that input.
 
-For package storage, begin with a managed institutional filesystem and a second
-independent copy; use object storage with an S3-compatible interface when it
-helps operations. Choose providers, capacity, and retention after measuring need.
-The interface is portable; redundancy is an operational property, not a product
-name. Do not put every ZIP into the catalog Git repository.
+## Delivery and recovery
 
-Retain database snapshots, immutable objects, request records, and recovery
-configuration in a second administrative/storage failure domain. Use a consistent
-[SQLite backup](https://www.sqlite.org/backup.html) for a running local registry,
-then include every object that snapshot references. A synchronized folder can
-propagate deletion and is not a tested recovery procedure. Archival deposits to
-Zenodo or Dataverse can supplement operational backups; evaluate their policies
-and recovery/API behavior before adoption.
+Approval records the reviewed fingerprint and reserves the candidate, without
+writing the current package or creating a release record. Delivery rechecks
+integrity, dependencies, the current base, newer-version ordering, file ownership,
+and destination conflicts. A process lock serializes local writers.
 
-**Outage test:** disconnect GitHub and the author's source host, restore catalog,
-records, and objects into a clean service, then install both smoke versions from
-SSC-NG and confirm results `4` and `5`. Already captured candidates can continue
-through independent review/check infrastructure. A new uncaptured GitHub source
-must wait for recovery or be supplied as an authorized upload. Restoring downloads
-alone does not prove that authentication and new submissions survive the outage.
+Before changing files, the adapter persists an undo journal. Each file is replaced
+atomically; the delivery receipt, release record, and current package reference
+commit in a database transaction after the files are written. Ordinary failures
+roll back the files and retain an approved candidate with a failed delivery
+attempt. Retrying an already completed delivery returns its saved receipt.
 
-## 7. Next local milestones (proposed, not release commitments)
+After an abrupt stop, startup checks each journal against the committed receipt.
+Uncommitted work is restored and marked for retry; committed work is retained.
+If files were changed outside the service, recovery reports a conflict and blocks
+further writes until the operator resolves it. This gives the local adapter
+recovery across restarts. A future production handoff must still coordinate with
+external readers: atomic individual file replacement is not a transaction across
+all files for a separate mirror process.
 
-1. **0.1.1 — provenance and storage:** add structured source links to form/API and
-   package pages; immutable object storage; migration checks for existing ZIPs;
-   preserve two submissions from the same overwritten source link.
-2. **0.1.2 — actual registry requests:** connect one central catalog PR workflow,
-   then bridge ZIP/form intake into it. Capture candidates before checks and bind
-   approval to the exact request revision. Add an email intake path when agreed.
-3. **0.1.3 — recovery demonstration:** independent replica and catalog/database
-   backups; restore without the author host or GitHub; document recovery time and
-   the maximum interval of records at risk between backups.
+## Existing data and compatibility
 
-Before public execution, add authenticated roles, protected fetches, and disposable
-isolated workers that cannot access publication credentials. The current Stata
-runner executes trusted code with this Mac user's permissions; separate working
-directories are not an operating-system sandbox. Wider Stata-version/OS coverage,
-legacy SSC/RePEc integration, and community review remain subsequent work.
+Existing submission ZIPs, review records, and legacy release records remain
+available internally for compatibility and review evidence. New dependency
+checks require the exact version to be delivered in the current local archive.
+An accepted name/version still cannot be overwritten; a package update uses a
+new version and goes through checks and approval.
+
+Legacy approvals are not automatically exported into the new current archive
+when the service starts. An old approval without a delivery record requires a
+new reviewed submission. Only successful new deliveries create release records
+and change the current output. Existing historical data is
+preserved, but historical restore, catalog snapshots, maintainer transfers, and
+versioned package-installation endpoints have been removed. Existing legacy
+database tables and settings are left untouched; new databases omit those tables.
+Keeping submission evidence is distinct from operating the downstream historical
+archive; it records what was submitted, checked, and approved.
+
+Completed unpublished candidates can be revised. Revising an approved candidate
+whose delivery is pending or failed supersedes that approval and cancels its
+delivery; the new revision must pass checks, confirmation, and review. A delivered
+package update uses a new version. Neither action rewrites the earlier evidence.
+
+## Remaining production integration
+
+- **Connect the archive destination.** Confirm the live current archive’s file
+  conventions and required metadata with its operators. Agree on access, how a
+  package update is accepted, and how its acknowledgment maps to the receipt.
+  Local files and a downloadable handoff bundle are implemented; live publication
+  is not connected.
+- **Replace simulated identity.** Connect real email delivery and authenticated
+  author/reviewer roles. Agree on maintainer changes and review policy. The local
+  demo mailbox and recorded reviewer names provide no multi-user authentication.
+- **Prepare hosted checks.** Use isolated disposable workers for untrusted
+  submissions, keep publication credentials away from those workers, and agree
+  on supported Stata versions and platforms. Separate local working directories
+  are not an operating-system sandbox. Choose and test the supported Stata
+  version/platform matrix before claiming broader compatibility.
+- **Extend intake when needed.** Email or repository-source intake can feed the
+  same saved-candidate/check/review flow. Such adapters should capture exact files
+  before checking them; none is required for the current ZIP submission demo.
+
+Archive history, storage-provider selection, deduplication, backups, and older
+version restoration belong to the established archive work rather than this
+submission prototype’s roadmap.

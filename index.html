@@ -3,48 +3,61 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A local Stata package registry with real submission checks, review records, and archived releases.">
-  <title>SSC-NG · Local package registry</title>
+  <meta name="description" content="Submit and review Stata packages, then write accepted packages to today’s working archive.">
+  <title>SSC-NG · Package submissions</title>
   <link rel="stylesheet" href="assets/styles.css">
   <script src="assets/app.js" defer></script>
 </head>
 <body>
 <div id="sscng-meeting">
   <header class="sg-top">
-    <div><div class="sg-brand">SSC <span>/ NG</span></div><div class="sg-small">Stata community package registry</div></div>
+    <div><div class="sg-brand">SSC <span>/ NG</span></div><div class="sg-small">Stata package submissions</div></div>
     <div class="sg-service"><span class="sg-badge" id="sg-service-status">Connecting</span><span class="sg-small" id="sg-stata-status">Local pilot</span></div>
   </header>
-  <nav class="sg-tabs" aria-label="Registry workspaces" role="tablist">
+  <nav class="sg-tabs" aria-label="Submission workflow" role="tablist">
     <button type="button" id="sg-tab-submit" role="tab" aria-selected="true" aria-controls="sg-submit" data-tab="submit">1 · Submit</button>
     <button type="button" id="sg-tab-review" role="tab" aria-selected="false" aria-controls="sg-review" data-tab="review" tabindex="-1">2 · Checks & review</button>
-    <button type="button" id="sg-tab-history" role="tab" aria-selected="false" aria-controls="sg-history" data-tab="history" tabindex="-1">3 · Package history</button>
-    <button type="button" id="sg-tab-records" role="tab" aria-selected="false" aria-controls="sg-records" data-tab="records" tabindex="-1">4 · Registry records</button>
+    <button type="button" id="sg-tab-archive" role="tab" aria-selected="false" aria-controls="sg-archive" data-tab="archive" tabindex="-1">3 · Deliver & archive</button>
   </nav>
   <div class="sg-content">
     <div id="sg-connection-error" class="sg-error" role="alert" hidden></div>
     <div id="sg-announcement" role="status" aria-live="polite" class="sg-toast" hidden></div>
     <section id="sg-submit" role="tabpanel" aria-labelledby="sg-tab-submit">
-      <div class="sg-intro"><div><div class="sg-kicker">Author workspace</div><h2 id="sg-form-title">Submit a Stata package</h2><p>Upload a bundle, run Stata, and send the results for review.</p></div><span class="sg-badge" id="sg-draft">New submission</span></div>
+      <div class="sg-intro"><div><div class="sg-kicker">Author workspace</div><h2 id="sg-form-title">Submit a Stata package</h2><p>Read your package details, confirm the maintainer, and get clear checks before review.</p></div><span class="sg-badge" id="sg-draft">New submission</span></div>
       <div class="sg-grid">
         <form id="sg-submission-form" class="sg-panel">
+          <div class="sg-upload">
+            <label>Package ZIP *<input id="sg-file" name="bundle" type="file" accept=".zip,application/zip" aria-describedby="sg-source-note"></label>
+            <p class="sg-caption" id="sg-source-note">Include a .pkg inventory, .ado command, .sthlp or .hlp help, and a test .do file. Maximum ZIP size: 10 MB.</p>
+            <button type="button" data-action="inspect-upload">Read package details</button>
+            <p class="sg-caption">Reads metadata and the file inventory without submitting or running package code. Check the imported details below.</p>
+            <div id="sg-intake-result" aria-live="polite" hidden></div>
+          </div>
           <div class="sg-fields" id="sg-package-fields">
             <label>Package name *<input id="sg-name" name="name" placeholder="mycommand" required pattern="[a-z][a-z0-9_]*" maxlength="32" title="Use a lowercase letter followed by lowercase letters, digits, or underscores."></label>
-            <label>Release version *<input id="sg-version" name="version" placeholder="1.0.0" required pattern="[0-9]+\.[0-9]+\.[0-9]+"></label>
+            <label>Release version *<input id="sg-version" name="version" placeholder="1.0.0" required pattern="[0-9]+\.[0-9]+\.[0-9]+"><span class="sg-caption">This pilot uses X.Y.Z versions.</span></label>
             <label class="sg-full">Title *<input id="sg-title" name="title" placeholder="A short description of the package" required maxlength="200"></label>
             <label>Maintainer *<input id="sg-maintainer" name="maintainer" required maxlength="100"></label>
             <label>Email *<input id="sg-email" name="email" type="email" required maxlength="200"></label>
+            <div id="sg-owner-note" class="sg-note sg-full" hidden></div>
             <label>Minimum Stata version *<input id="sg-stata" name="stata" value="16.0" required pattern="[0-9]+(\.[0-9]+)?"></label>
             <label>License *<select id="sg-license" name="license"><option>Unspecified</option><option>MIT</option><option>BSD-3-Clause</option><option>GPL-3.0</option><option>GPL-2.0</option><option>Apache-2.0</option></select></label>
-            <label class="sg-full">Dependencies<textarea id="sg-deps" name="dependencies" placeholder="sscng_helper@1.0.0" aria-describedby="sg-deps-help"></textarea><span class="sg-caption" id="sg-deps-help">One package@version per line. Leave blank for none. Dependencies must already be approved in this local registry.</span></label>
+            <label class="sg-full">Dependencies<textarea id="sg-deps" name="dependencies" placeholder="sscng_helper@0.1.0" aria-describedby="sg-deps-help"></textarea><span class="sg-caption" id="sg-deps-help">One package@version per line. Leave blank for none. Dependencies must already be delivered to this demo’s archive.</span></label>
+            <label class="sg-full">Source repository or project URL<input id="sg-source_url" name="source_url" type="url" placeholder="https://…"><span class="sg-caption">Optional. Authors can keep their development work wherever they prefer.</span></label>
+            <label class="sg-full">Test file<input id="sg-test_file" name="test_file" value="smoke.do" required placeholder="smoke.do"><span class="sg-caption">A .do file in your ZIP with assertions or runnable examples. This pilot runs it in Stata after installation.</span></label>
             <label class="sg-full">Release notes *<textarea id="sg-notes" name="notes" placeholder="What changed in this release?" required maxlength="5000"></textarea></label>
-            <label class="sg-full">Package ZIP *<input id="sg-file" name="bundle" type="file" accept=".zip,application/zip" aria-describedby="sg-source-note"></label>
           </div>
-          <p class="sg-caption" id="sg-source-note">Include the package .pkg inventory, .ado command, .sthlp help, and smoke.do checks. Maximum ZIP size: 10 MB.</p>
           <div class="sg-note" id="sg-revision-note" hidden></div>
           <div class="sg-error" role="alert" id="sg-form-error" hidden></div>
           <div class="sg-actions"><button type="submit" class="sg-primary" data-action="submit-upload">Submit & run checks</button><button type="button" data-action="clear-form" id="sg-clear-form" hidden>Start a new submission</button></div>
         </form>
         <aside class="sg-stack">
+          <div class="sg-panel">
+            <h3>Updating an existing package?</h3>
+            <label for="sg-update-package" class="sg-small">Current package</label><select id="sg-update-package" disabled><option>No packages delivered yet</option></select>
+            <div class="sg-actions"><button type="button" data-action="start-update" id="sg-start-update" disabled>Submit update</button></div>
+            <p class="sg-caption">Start from the accepted details. Updates use the recorded maintainer’s email for confirmation.</p>
+          </div>
           <div class="sg-panel">
             <h3>Run only code you trust</h3>
             <p class="sg-small">Package checks execute Stata .ado and .do code on this Mac. This local pilot does not sandbox that code.</p>
@@ -55,18 +68,17 @@
             <label for="sg-example" class="sg-small">Included example</label><select id="sg-example" disabled><option>Loading examples…</option></select>
             <div id="sg-example-detail" class="sg-note">Examples use the same check and review workflow as uploads.</div>
             <div class="sg-actions"><button type="button" data-action="submit-example" id="sg-example-run" disabled>Submit example for checks</button></div>
-            <p class="sg-caption">Approve a passing release before trying its update. The dependency example needs its helper release approved first.</p>
+            <p class="sg-caption">Confirm, approve, and deliver a passing package before trying its update. The dependency example needs its helper delivered first.</p>
           </div>
-          <div class="sg-note">Submissions, decisions, logs, and releases are saved on this Mac. Approval publishes to this local registry.</div>
+          <div class="sg-note"><strong>Submit → confirm & review → deliver.</strong><p>Approval records the decision. Delivery writes the reviewed files to today’s local archive. The existing <a href="https://github.com/ssc-ng/archive/" target="_blank" rel="noopener noreferrer">ssc-ng/archive process</a> handles archive history and versioning.</p><p>Maintainer confirmation uses a visible demo mailbox; no email is sent.</p></div>
         </aside>
       </div>
     </section>
     <section id="sg-review" role="tabpanel" aria-labelledby="sg-tab-review" hidden></section>
-    <section id="sg-history" role="tabpanel" aria-labelledby="sg-tab-history" hidden></section>
-    <section id="sg-records" role="tabpanel" aria-labelledby="sg-tab-records" hidden></section>
+    <section id="sg-archive" role="tabpanel" aria-labelledby="sg-tab-archive" hidden></section>
   </div>
-  <footer class="sg-footer"><span>Local pilot · Single operator · Real Stata execution</span><span id="sg-version-label">SSC-NG</span></footer>
+  <footer class="sg-footer"><span>Local submission demo · Real Stata checks</span><span id="sg-version-label">SSC-NG</span></footer>
 </div>
-<noscript>This local registry needs JavaScript enabled.</noscript>
+<noscript>This submission demo needs JavaScript enabled.</noscript>
 </body>
 </html>

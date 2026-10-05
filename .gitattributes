@@ -5,3 +5,9 @@
 *.cjs text eol=lf
 *.md text eol=lf
 VERSION text eol=lf
+# Preserve upstream checksums and formatting, including CRLF and trailing spaces.
+trial-package/fre-1.2.5/fre.ado -text -whitespace
+trial-package/fre-1.2.5/fre.hlp -text -whitespace
+trial-package/fre-1.2.5/fre.pkg -text -whitespace
+trial-package/fre-1.2.5/LICENSE -text -whitespace
+trial-package/fre-1.2.5/stata.toc -text -whitespace

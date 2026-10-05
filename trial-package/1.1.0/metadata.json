@@ -1,0 +1,12 @@
+{
+  "name": "sscng_trial",
+  "version": "1.1.0",
+  "title": "SSC-NG submission trial package",
+  "maintainer": "SSC-NG trial-package contributors",
+  "email": "trial@example.invalid",
+  "stata": "16.0",
+  "license": "MIT",
+  "dependencies": [],
+  "notes": "Trial update: adds one after doubling the input. sscng_trial, value(2) now returns 5 instead of 4. Updates the help and assertions so the reviewer can compare changes. No dependencies. Keeps the same illustrative maintainer contact.",
+  "test_file": "sscng_trial_test.do"
+}

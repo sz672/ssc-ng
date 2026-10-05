@@ -1,0 +1,10 @@
+v 3
+d SSC-NG submission trial package
+d Version: 1.1.0
+d Requires Stata 16.0 or later. No external package dependencies.
+d License: MIT; see sscng_trial_LICENSE.txt.
+f sscng_trial.ado
+f sscng_trial.sthlp
+f sscng_trial_test.do
+f sscng_trial_LICENSE.txt
+e

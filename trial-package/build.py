@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Build reproducible, flat, dependency-free sscng_smoke upload ZIPs.
+"""Build reproducible, flat upload ZIPs for the trial fixtures and real fre.
 
-Run: python3 smoke-package/build.py
+Run: python3 trial-package/build.py
 Use --check to verify existing ZIPs and manifest without writing changes.
 Uses only Python's standard library; Stata is not needed to build.
 """
@@ -18,21 +18,29 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parent
 VERSIONS = ("1.0.0", "1.1.0")
-FILENAMES = ("LICENSE", "metadata.json", "smoke.do", "sscng_smoke.ado",
-             "sscng_smoke.pkg", "sscng_smoke.sthlp", "stata.toc")
+FILENAMES = ("sscng_trial_LICENSE.txt", "metadata.json", "sscng_trial_test.do", "sscng_trial.ado",
+             "sscng_trial.pkg", "sscng_trial.sthlp", "stata.toc")
+PACKAGES = [("sscng_trial", version, version, FILENAMES, f"sscng_trial-{version}.zip")
+            for version in VERSIONS] + [
+    ("fre", "1.2.5", "fre-1.2.5",
+     ("fre.ado", "fre.hlp", "fre.pkg", "LICENSE", "stata.toc", "metadata.json", "fre_check.do", "SOURCE.json"),
+     "fre-1.2.5-demo.zip")]
 
 
-def package_bytes(version: str) -> bytes:
-    if version not in VERSIONS:
-        raise ValueError(f"Unsupported fixture version: {version}")
-    source = ROOT / version
+def package_bytes(name: str, version: str, folder: str, filenames: tuple[str, ...]) -> bytes:
+    source = ROOT / folder
     metadata = json.loads((source / "metadata.json").read_text(encoding="utf-8"))
-    if (metadata["name"], metadata["version"], metadata["dependencies"]) != ("sscng_smoke", version, []):
+    if (metadata["name"], metadata["version"], metadata["dependencies"]) != (name, version, []):
         raise ValueError(f"Fixture metadata does not match its independent package: {source}")
+    if (source / "SOURCE.json").exists():
+        provenance = json.loads((source / "SOURCE.json").read_text(encoding="utf-8"))
+        for filename, record in provenance["upstream_files"].items():
+            if hashlib.sha256((source / filename).read_bytes()).hexdigest() != record["sha256"]:
+                raise ValueError(f"Upstream file differs from the pinned source: {source / filename}")
     memory = io.BytesIO()
     with zipfile.ZipFile(memory, "w", compression=zipfile.ZIP_STORED) as archive:
-        for filename in FILENAMES:
-            info = zipfile.ZipInfo(filename, date_time=(2026, 9, 28, 0, 0, 0))
+        for filename in filenames:
+            info = zipfile.ZipInfo(filename, date_time=(2026, 10, 5, 0, 0, 0))
             info.create_system = 3
             info.external_attr = 0o100644 << 16
             info.compress_type = zipfile.ZIP_STORED
@@ -45,16 +53,15 @@ def build_all(output: Path | None = None, *, check: bool = False) -> list[dict]:
     if not check:
         output.mkdir(parents=True, exist_ok=True)
     built = []
-    for version in VERSIONS:
-        data = package_bytes(version)
-        filename = f"sscng_smoke-{version}.zip"
+    for name, version, folder, filenames, filename in PACKAGES:
+        data = package_bytes(name, version, folder, filenames)
         path = output / filename
         if check:
             if not path.is_file() or path.read_bytes() != data:
                 raise ValueError(f"Missing or stale build: {path}")
         elif not path.exists() or path.read_bytes() != data:
             path.write_bytes(data)
-        built.append({"name": "sscng_smoke", "version": version,
+        built.append({"name": name, "version": version,
                       "file": filename, "size": len(data),
                       "sha256": hashlib.sha256(data).hexdigest(),
                       "dependencies": [], "license": "MIT"})

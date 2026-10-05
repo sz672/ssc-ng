@@ -1,0 +1,31 @@
+{
+  "packages": [
+    {
+      "name": "sscng_trial",
+      "version": "1.0.0",
+      "file": "sscng_trial-1.0.0.zip",
+      "size": 4336,
+      "sha256": "026db84a9da0ce2f4414ed6d6bf2335f53b7b0a069d24e5f625da5a65254d23b",
+      "dependencies": [],
+      "license": "MIT"
+    },
+    {
+      "name": "sscng_trial",
+      "version": "1.1.0",
+      "file": "sscng_trial-1.1.0.zip",
+      "size": 4422,
+      "sha256": "485e56bc10609ab596016bd486ed897ee783402b1f2e5a6283be625bca177501",
+      "dependencies": [],
+      "license": "MIT"
+    },
+    {
+      "name": "fre",
+      "version": "1.2.5",
+      "file": "fre-1.2.5-demo.zip",
+      "size": 53846,
+      "sha256": "abd058c2fb4d3eae083602e2aa53051cd0e90db1fa30d147b3c08551ec59754f",
+      "dependencies": [],
+      "license": "MIT"
+    }
+  ]
+}
